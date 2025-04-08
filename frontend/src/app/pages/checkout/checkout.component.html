@@ -1,0 +1,353 @@
+<div class="checkout-container">
+  <div class="checkout-header">
+    <h1><i class="fas fa-shopping-bag"></i> Finaliser votre commande</h1>
+  </div>
+
+  <!-- Indicateur de chargement -->
+  <div *ngIf="isLoading" class="loading-spinner">
+    <div class="spinner"></div>
+    <p>Traitement en cours...</p>
+  </div>
+
+  <!-- Message d'erreur -->
+  <div *ngIf="error" class="error-message">
+    <i class="fas fa-exclamation-circle"></i>
+    <p>{{ error }}</p>
+    <button class="close-error" (click)="error = ''"><i class="fas fa-times"></i></button>
+  </div>
+
+  <!-- Étapes du processus de commande -->
+  <div class="checkout-steps" *ngIf="!isLoading">
+    <div class="step" [class.active]="step === 'shipping'" [class.completed]="step === 'payment' || step === 'confirmation'">
+      <div class="step-number">1</div>
+      <div class="step-label">Livraison</div>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step" [class.active]="step === 'payment'" [class.completed]="step === 'confirmation'">
+      <div class="step-number">2</div>
+      <div class="step-label">Paiement</div>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step" [class.active]="step === 'confirmation'">
+      <div class="step-number">3</div>
+      <div class="step-label">Confirmation</div>
+    </div>
+  </div>
+
+  <div class="checkout-content" *ngIf="!isLoading">
+    <!-- Étape 1: Informations de livraison -->
+    <div class="checkout-section" *ngIf="step === 'shipping'">
+      <h2>Adresse de livraison</h2>
+      
+      <form [formGroup]="checkoutForm" class="shipping-form">
+        <div class="form-group">
+          <label for="fullName">Nom complet *</label>
+          <input type="text" id="fullName" formControlName="fullName" placeholder="John Doe">
+          <div class="error-message" *ngIf="checkoutForm.get('fullName')?.invalid && checkoutForm.get('fullName')?.touched">
+            Veuillez entrer votre nom complet
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="address">Adresse *</label>
+          <input type="text" id="address" formControlName="address" placeholder="123 Rue Exemple">
+          <div class="error-message" *ngIf="checkoutForm.get('address')?.invalid && checkoutForm.get('address')?.touched">
+            Veuillez entrer votre adresse
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="city">Ville *</label>
+            <input type="text" id="city" formControlName="city" placeholder="Paris">
+            <div class="error-message" *ngIf="checkoutForm.get('city')?.invalid && checkoutForm.get('city')?.touched">
+              Veuillez entrer votre ville
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="postalCode">Code postal *</label>
+            <input type="text" id="postalCode" formControlName="postalCode" placeholder="1234">
+            <div class="error-message" *ngIf="checkoutForm.get('postalCode')?.invalid && checkoutForm.get('postalCode')?.touched">
+              Veuillez entrer un code postal valide (4 chiffres)
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="country">Pays *</label>
+            <input type="text" id="country" formControlName="country" placeholder="France">
+            <div class="error-message" *ngIf="checkoutForm.get('country')?.invalid && checkoutForm.get('country')?.touched">
+              Veuillez entrer votre pays
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="phone">Téléphone *</label>
+            <input type="tel" id="phone" formControlName="phone" placeholder="12345678">
+            <div class="error-message" *ngIf="checkoutForm.get('phone')?.invalid && checkoutForm.get('phone')?.touched">
+              Veuillez entrer un numéro de téléphone valide (8 chiffres)
+            </div>
+          </div>
+        </div>
+      </form>
+      
+      <div class="form-actions">
+        <button class="back-btn" routerLink="/espaceclient/panier">
+          <i class="fas fa-arrow-left"></i> Retour au panier
+        </button>
+        <button class="next-btn" [disabled]="checkoutForm.invalid" (click)="nextStep()">
+          Paiement <i class="fas fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Étape 2: Paiement -->
+    <div class="checkout-section" *ngIf="step === 'payment'">
+      <h2>Méthode de paiement</h2>
+      
+      <div class="payment-methods">
+        <div class="payment-method" [class.selected]="selectedPaymentMethod === 'card'" (click)="setPaymentMethod('card')">
+          <div class="payment-method-radio">
+            <div class="radio-indicator" [class.active]="selectedPaymentMethod === 'card'"></div>
+          </div>
+          <div class="payment-method-icon">
+            <i class="far fa-credit-card"></i>
+          </div>
+          <div class="payment-method-label">Carte bancaire</div>
+        </div>
+        
+        <div class="payment-method" [class.selected]="selectedPaymentMethod === 'paypal'" (click)="setPaymentMethod('paypal')">
+          <div class="payment-method-radio">
+            <div class="radio-indicator" [class.active]="selectedPaymentMethod === 'paypal'"></div>
+          </div>
+          <div class="payment-method-icon">
+            <i class="fab fa-paypal"></i>
+          </div>
+          <div class="payment-method-label">PayPal</div>
+        </div>
+        
+        <div class="payment-method" [class.selected]="selectedPaymentMethod === 'cash'" (click)="setPaymentMethod('cash')">
+          <div class="payment-method-radio">
+            <div class="radio-indicator" [class.active]="selectedPaymentMethod === 'cash'"></div>
+          </div>
+          <div class="payment-method-icon">
+            <i class="fas fa-money-bill-wave"></i>
+          </div>
+          <div class="payment-method-label">Espèces à la livraison</div>
+        </div>
+      </div>
+      
+      <div class="payment-details" *ngIf="selectedPaymentMethod === 'card'">
+        <form [formGroup]="paymentForm" class="payment-form">
+          <div class="form-group">
+            <label for="cardName">Nom sur la carte *</label>
+            <input type="text" id="cardName" formControlName="cardName" placeholder="John Doe">
+            <div class="error-message" *ngIf="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched">
+              Veuillez entrer le nom sur la carte
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="cardNumber">Numéro de carte *</label>
+            <input type="text" id="cardNumber" formControlName="cardNumber" placeholder="1234 5678 9012 3456">
+            <div class="error-message" *ngIf="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched">
+              Veuillez entrer un numéro de carte valide (16 chiffres)
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="expMonth">Mois d'expiration *</label>
+              <input type="number" id="expMonth" formControlName="expMonth" placeholder="MM" min="1" max="12">
+              <div class="error-message" *ngIf="paymentForm.get('expMonth')?.invalid && paymentForm.get('expMonth')?.touched">
+                Mois invalide
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="expYear">Année d'expiration *</label>
+              <input type="number" id="expYear" formControlName="expYear" placeholder="AAAA">
+              <div class="error-message" *ngIf="paymentForm.get('expYear')?.invalid && paymentForm.get('expYear')?.touched">
+                Année invalide
+              </div>
+            </div>
+            
+            <div class="form-group cvv-group">
+              <label for="cvv">CVV *</label>
+              <input type="text" id="cvv" formControlName="cvv" placeholder="123">
+              <div class="error-message" *ngIf="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched">
+                CVV invalide
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      
+      <div class="payment-details" *ngIf="selectedPaymentMethod === 'paypal'">
+        <div class="paypal-info">
+          <p>Vous allez être redirigé vers PayPal pour finaliser votre paiement en toute sécurité.</p>
+          <div class="paypal-logo">
+            <i class="fab fa-paypal"></i> PayPal
+          </div>
+        </div>
+      </div>
+      
+      <div class="payment-details" *ngIf="selectedPaymentMethod === 'cash'">
+        <div class="cash-payment-info">
+          <p><i class="fas fa-info-circle"></i> Vous paierez directement au livreur lors de la réception de votre commande.</p>
+          <div class="cash-notice">
+            <p><strong>Important :</strong></p>
+            <ul>
+              <li>Veuillez préparer le montant exact de <strong>{{ getTotal() | currency:'EUR' }}</strong></li>
+              <li>Un reçu vous sera remis par le livreur</li>
+              <li>En cas d'absence, votre commande sera retournée à notre entrepôt</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-actions">
+        <button class="back-btn" (click)="prevStep()">
+          <i class="fas fa-arrow-left"></i> Retour
+        </button>
+        <button class="next-btn" [disabled]="selectedPaymentMethod === 'card' && paymentForm.invalid" (click)="nextStep()">
+          <span *ngIf="selectedPaymentMethod === 'cash'">
+            Continuer <i class="fas fa-arrow-right"></i>
+          </span>
+          <span *ngIf="selectedPaymentMethod !== 'cash'">
+            Payer <i class="fas fa-lock"></i>
+          </span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Étape 3: Confirmation -->
+    <div class="checkout-section" *ngIf="step === 'confirmation'">
+      <div class="order-confirmation">
+        <div class="confirmation-icon">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <h2>Commande confirmée!</h2>
+        <p class="confirmation-message">Merci pour votre commande. Votre commande #{{ orderId }} a été traitée avec succès.</p>
+        
+        <!-- Message spécifique pour le paiement en espèces -->
+        <div *ngIf="selectedPaymentMethod === 'cash'" class="cash-payment-confirmation">
+          <p class="cash-message"><i class="fas fa-info-circle"></i> Votre commande est en attente de paiement.</p>
+          <p>Préparez le montant exact de <strong>{{ getTotal() | currency:'EUR' }}</strong> pour la livraison.</p>
+          <div class="cash-notice delivery-notice">
+            <p><strong>Comment ça marche :</strong></p>
+            <ol>
+              <li>Votre commande est en préparation</li>
+              <li>Notre livreur vous contactera à l'approche de la livraison</li>
+              <li>Vous paierez le livreur en espèces lors de la réception</li>
+              <li>Un reçu vous sera remis après paiement</li>
+            </ol>
+          </div>
+        </div>
+        
+        <!-- Message standard pour les autres méthodes de paiement -->
+        <p *ngIf="selectedPaymentMethod !== 'cash'" class="confirmation-details">Un email de confirmation a été envoyé à l'adresse associée à votre compte.</p>
+        
+        <div class="order-summary">
+          <h3>Récapitulatif de la commande</h3>
+          <div class="summary-item">
+            <span>Numéro de commande:</span>
+            <span>#{{ orderId }}</span>
+          </div>
+          <div class="summary-item">
+            <span>Date:</span>
+            <span>{{ order?.created_at | date:'dd/MM/yyyy' }}</span>
+          </div>
+          <div class="summary-item">
+            <span>Statut:</span>
+            <span class="order-status" [ngClass]="{'pending-payment': selectedPaymentMethod === 'cash'}">
+              <i *ngIf="selectedPaymentMethod === 'cash'" class="fas fa-clock"></i>
+              {{ selectedPaymentMethod === 'cash' ? 'En attente de paiement' : order?.status_display }}
+            </span>
+          </div>
+          <div class="summary-item">
+            <span>Méthode de paiement:</span>
+            <span>
+              <i *ngIf="selectedPaymentMethod === 'card'" class="far fa-credit-card"></i>
+              <i *ngIf="selectedPaymentMethod === 'paypal'" class="fab fa-paypal"></i>
+              <i *ngIf="selectedPaymentMethod === 'cash'" class="fas fa-money-bill-wave"></i>
+              {{ selectedPaymentMethod === 'card' ? 'Carte bancaire' : 
+                 selectedPaymentMethod === 'paypal' ? 'PayPal' : 'Espèces à la livraison' }}
+            </span>
+          </div>
+          <div class="summary-item">
+            <span>Total:</span>
+            <span class="order-total">{{ order?.total_amount | currency:'EUR' }}</span>
+          </div>
+        </div>
+        
+        <div class="confirmation-actions">
+          <p class="confirmation-help-text">Votre commande a été enregistrée avec succès. Vous pouvez maintenant consulter les détails ou retourner à la boutique.</p>
+          <button class="view-order-btn" (click)="viewOrderDetails()">
+            <i class="fas fa-eye"></i> Voir les détails de la commande
+          </button>
+          <button class="back-to-shop-btn primary" (click)="backToShop()">
+            <i class="fas fa-store"></i> Retourner à la boutique
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Récapitulatif de la commande (affiché sur les côtés pour étapes 1 et 2) -->
+  <div class="order-summary-sidebar" *ngIf="step !== 'confirmation' && !isLoading">
+    <div class="summary-header">
+      <h3>Récapitulatif</h3>
+    </div>
+    
+    <div class="summary-content">
+      <div class="summary-items">
+        <div class="summary-item" *ngFor="let item of getCartItems()">
+          <div class="item-quantity">{{ item.quantity }}x</div>
+          <div class="item-name">{{ item.product.name }}</div>
+          <div class="item-price">{{ (item.product.final_price || item.product.price) * item.quantity | currency:'EUR' }}</div>
+        </div>
+      </div>
+      
+      <div class="promo-code" *ngIf="step === 'payment'">
+        <div class="promo-input">
+          <input type="text" [(ngModel)]="promoCode" placeholder="Code promo">
+          <button (click)="applyPromoCode()" [disabled]="!promoCode">Appliquer</button>
+        </div>
+        <div class="promo-message success" *ngIf="promoSuccess">{{ promoSuccess }}</div>
+        <div class="promo-message error" *ngIf="promoError">{{ promoError }}</div>
+      </div>
+      
+      <div class="summary-totals">
+        <div class="summary-row">
+          <span>Sous-total</span>
+          <span>{{ getSubtotal() | currency:'EUR' }}</span>
+        </div>
+        
+        <div class="summary-row" *ngIf="getDiscount() > 0">
+          <span>Réduction</span>
+          <span class="discount">-{{ getDiscount() | currency:'EUR' }}</span>
+        </div>
+        
+        <div class="summary-row">
+          <span>TVA (20%)</span>
+          <span>{{ getTaxAmount() | currency:'EUR' }}</span>
+        </div>
+        
+        <div class="summary-row">
+          <span>Livraison</span>
+          <span>{{ getShippingCost() | currency:'EUR' }}</span>
+        </div>
+        
+        <div class="summary-divider"></div>
+        
+        <div class="summary-row total">
+          <span>Total</span>
+          <span>{{ getTotal() | currency:'EUR' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div> 

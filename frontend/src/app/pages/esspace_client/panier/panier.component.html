@@ -1,0 +1,112 @@
+<div class="panier-container">
+  <div class="panier-header">
+    <h1><i class="fas fa-shopping-bag"></i> Mon Panier</h1>
+    <p class="subtitle">Vos articles sélectionnés</p>
+  </div>
+
+  <!-- Indicateur de chargement -->
+  <div *ngIf="isLoading" class="loading-spinner">
+    <div class="spinner"></div>
+    <p>Chargement en cours...</p>
+  </div>
+
+  <!-- Message d'erreur -->
+  <div *ngIf="error" class="error-message">
+    <i class="fas fa-exclamation-circle"></i>
+    <p>{{ error }}</p>
+    <button class="close-error" (click)="error = ''"><i class="fas fa-times"></i></button>
+  </div>
+
+  <div class="panier-content" [class.is-loading]="isLoading">
+    <div *ngIf="cartItems.length === 0" class="empty-cart">
+      <div class="empty-cart-icon">
+        <i class="fas fa-shopping-cart"></i>
+      </div>
+      <h2>Votre panier est vide</h2>
+      <p>Parcourez notre boutique et ajoutez des produits pour les voir apparaître ici.</p>
+      <button class="return-btn" routerLink="/esspace_client/shoop-bord">
+        <i class="fas fa-arrow-left"></i> Continuer mes achats
+      </button>
+    </div>
+
+    <div *ngIf="cartItems.length > 0" class="cart-items-container">
+      <div class="cart-items">
+        <div *ngFor="let item of cartItems" class="cart-item">
+          <div class="item-image">
+            <img [src]="item.product.image || 'assets/images/placeholder.png'" [alt]="item.product.name">
+          </div>
+          
+          <div class="item-details">
+            <h3 class="item-name">{{ item.product.name }}</h3>
+            <p class="item-category">{{ item.product.category }}</p>
+            <div class="item-price">
+              <span *ngIf="item.product.discount_percentage" class="original-price">
+                {{ item.product.price | currency:'EUR' }}
+              </span>
+              <span class="final-price">
+                {{ item.product.final_price || item.product.price | currency:'EUR' }}
+              </span>
+            </div>
+          </div>
+          
+          <div class="item-quantity">
+            <button class="quantity-btn minus" (click)="updateQuantity(item.product.id, -1)" [disabled]="isLoading">
+              <i class="fas fa-minus"></i>
+            </button>
+            <span class="quantity-value">{{ item.quantity }}</span>
+            <button class="quantity-btn plus" (click)="updateQuantity(item.product.id, 1)" [disabled]="isLoading">
+              <i class="fas fa-plus"></i>
+            </button>
+          </div>
+          
+          <div class="item-subtotal">
+            {{ (item.product.final_price || item.product.price) * item.quantity | currency:'EUR' }}
+          </div>
+          
+          <button class="remove-btn" (click)="removeFromCart(item.product.id)" [disabled]="isLoading">
+            <i class="fas fa-trash-alt"></i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="cart-summary">
+        <div class="summary-header">
+          <h3>Récapitulatif</h3>
+        </div>
+        
+        <div class="summary-content">
+          <div class="summary-row">
+            <span>Sous-total</span>
+            <span>{{ getSubTotal() | currency:'EUR' }}</span>
+          </div>
+          
+          <div class="summary-row">
+            <span>TVA (20%)</span>
+            <span>{{ getTax() | currency:'EUR' }}</span>
+          </div>
+          
+          <div class="summary-row">
+            <span>Livraison</span>
+            <span>{{ getShipping() | currency:'EUR' }}</span>
+          </div>
+          
+          <div class="summary-divider"></div>
+          
+          <div class="summary-row total">
+            <span>Total</span>
+            <span>{{ getTotal() | currency:'EUR' }}</span>
+          </div>
+          
+          <button class="checkout-btn" (click)="checkout()" [disabled]="isLoading">
+            <i class="fas" [class.fa-lock]="!isLoading" [class.fa-spinner]="isLoading" [class.fa-spin]="isLoading"></i> 
+            {{ isLoading ? 'Traitement en cours...' : 'Passer la commande' }}
+          </button>
+          
+          <button class="continue-shopping" routerLink="/esspace_client/shoop-bord" [disabled]="isLoading">
+            <i class="fas fa-arrow-left"></i> Continuer mes achats
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

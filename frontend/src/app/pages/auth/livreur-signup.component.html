@@ -1,0 +1,216 @@
+<div class="livreur-signup-container">
+  <div class="signup-form-wrapper">
+    <h2 class="signup-title">Devenir Livreur Partenaire</h2>
+    <p class="signup-subtitle">Rejoignez notre équipe de livreurs et gagnez de l'argent en livrant des repas</p>
+
+    <!-- Messages -->
+    <div *ngIf="error" class="error-message">
+      <i class="fas fa-exclamation-circle"></i> {{ error }}
+      <button class="close-message" (click)="error = ''"><i class="fas fa-times"></i></button>
+    </div>
+    <div *ngIf="successMessage" class="success-message">
+      <i class="fas fa-check-circle"></i> {{ successMessage }}
+      <button class="close-message" (click)="successMessage = ''"><i class="fas fa-times"></i></button>
+    </div>
+
+    <!-- Formulaire d'inscription -->
+    <form [formGroup]="signupForm" (ngSubmit)="onSubmit()" class="signup-form">
+      <div class="form-section">
+        <h3 class="section-title">Informations de Compte</h3>
+        
+        <div class="form-group">
+          <label for="username">Nom d'utilisateur *</label>
+          <input type="text" id="username" formControlName="username" placeholder="Ex: john_doe" class="form-input">
+          <div *ngIf="isFieldInvalid('username')" class="error-feedback">
+            <span *ngIf="signupForm.get('username')?.errors?.['required']">Nom d'utilisateur requis</span>
+            <span *ngIf="signupForm.get('username')?.errors?.['minlength']">Au moins 4 caractères requis</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="email">Email *</label>
+          <input type="email" id="email" formControlName="email" placeholder="Ex: john.doe@example.com" class="form-input">
+          <div *ngIf="isFieldInvalid('email')" class="error-feedback">
+            <span *ngIf="signupForm.get('email')?.errors?.['required']">Email requis</span>
+            <span *ngIf="signupForm.get('email')?.errors?.['email']">Format d'email invalide</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="password">Mot de passe *</label>
+          <input type="password" id="password" formControlName="password" placeholder="Votre mot de passe" class="form-input">
+          <div *ngIf="isFieldInvalid('password')" class="error-feedback">
+            <span *ngIf="signupForm.get('password')?.errors?.['required']">Mot de passe requis</span>
+            <span *ngIf="signupForm.get('password')?.errors?.['minlength']">Au moins 8 caractères requis</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="confirmPassword">Confirmer le mot de passe *</label>
+          <input type="password" id="confirmPassword" formControlName="confirmPassword" placeholder="Confirmez votre mot de passe" class="form-input">
+          <div *ngIf="isFieldInvalid('confirmPassword') || signupForm.errors?.['passwordMismatch']" class="error-feedback">
+            <span *ngIf="signupForm.get('confirmPassword')?.errors?.['required']">Confirmation requise</span>
+            <span *ngIf="signupForm.errors?.['passwordMismatch']">Les mots de passe ne correspondent pas</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-section">
+        <h3 class="section-title">Informations Personnelles</h3>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="firstName">Prénom *</label>
+            <input type="text" id="firstName" formControlName="firstName" placeholder="Ex: John" class="form-input">
+            <div *ngIf="isFieldInvalid('firstName')" class="error-feedback">
+              <span>Prénom requis</span>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="lastName">Nom *</label>
+            <input type="text" id="lastName" formControlName="lastName" placeholder="Ex: Doe" class="form-input">
+            <div *ngIf="isFieldInvalid('lastName')" class="error-feedback">
+              <span>Nom requis</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="phoneNumber">Numéro de téléphone *</label>
+          <input type="tel" id="phoneNumber" formControlName="phoneNumber" placeholder="Ex: 0612345678" class="form-input">
+          <div *ngIf="isFieldInvalid('phoneNumber')" class="error-feedback">
+            <span *ngIf="signupForm.get('phoneNumber')?.errors?.['required']">Numéro de téléphone requis</span>
+            <span *ngIf="signupForm.get('phoneNumber')?.errors?.['pattern']">Numéro de téléphone invalide (10 chiffres)</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="address">Adresse *</label>
+          <input type="text" id="address" formControlName="address" placeholder="Ex: 123 Rue de Paris" class="form-input">
+          <div *ngIf="isFieldInvalid('address')" class="error-feedback">
+            <span>Adresse requise</span>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="city">Ville *</label>
+            <input type="text" id="city" formControlName="city" placeholder="Ex: Paris" class="form-input">
+            <div *ngIf="isFieldInvalid('city')" class="error-feedback">
+              <span>Ville requise</span>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="postalCode">Code postal *</label>
+            <input type="text" id="postalCode" formControlName="postalCode" placeholder="Ex: 75001" class="form-input">
+            <div *ngIf="isFieldInvalid('postalCode')" class="error-feedback">
+              <span *ngIf="signupForm.get('postalCode')?.errors?.['required']">Code postal requis</span>
+              <span *ngIf="signupForm.get('postalCode')?.errors?.['pattern']">Format invalide (5 chiffres)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-section">
+        <h3 class="section-title">Informations de Livraison</h3>
+        
+        <div class="form-group">
+          <label for="vehicle">Type de véhicule *</label>
+          <select id="vehicle" formControlName="vehicle" class="form-input">
+            <option *ngFor="let vehicle of vehicleTypes" [value]="vehicle.id">{{ vehicle.label }}</option>
+          </select>
+          <div *ngIf="isFieldInvalid('vehicle')" class="error-feedback">
+            <span>Type de véhicule requis</span>
+          </div>
+        </div>
+        
+        <div class="form-group document-upload">
+          <label>Pièce d'identité (recto-verso) *</label>
+          <div class="file-upload-wrapper">
+            <label for="idCard" class="file-upload-label">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <span>Choisir un fichier</span>
+            </label>
+            <input type="file" id="idCard" (change)="onFileSelected($event, 'idCard')" accept="image/*,.pdf" class="file-upload-input">
+            <div class="file-name">{{ signupForm.get('idCard')?.value?.name || 'Aucun fichier choisi' }}</div>
+          </div>
+          <div *ngIf="previewUrl" class="file-preview">
+            <img [src]="previewUrl" alt="Aperçu du document">
+          </div>
+          <div *ngIf="isFieldInvalid('idCard')" class="error-feedback">
+            <span>Pièce d'identité requise</span>
+          </div>
+        </div>
+        
+        <div class="form-group document-upload">
+          <label>Permis de conduire *</label>
+          <div class="file-upload-wrapper">
+            <label for="drivingLicense" class="file-upload-label">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <span>Choisir un fichier</span>
+            </label>
+            <input type="file" id="drivingLicense" (change)="onFileSelected($event, 'drivingLicense')" accept="image/*,.pdf" class="file-upload-input">
+            <div class="file-name">{{ signupForm.get('drivingLicense')?.value?.name || 'Aucun fichier choisi' }}</div>
+          </div>
+          <div *ngIf="isFieldInvalid('drivingLicense')" class="error-feedback">
+            <span>Permis de conduire requis</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-section">
+        <div class="form-group checkbox-group">
+          <label class="checkbox-container">
+            <input type="checkbox" formControlName="termsAccepted">
+            <span class="checkmark"></span>
+            J'accepte les <a href="#" target="_blank">conditions générales</a> et la <a href="#" target="_blank">politique de confidentialité</a> *
+          </label>
+          <div *ngIf="isFieldInvalid('termsAccepted')" class="error-feedback">
+            <span>Vous devez accepter les conditions générales</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-actions">
+        <button type="submit" class="submit-btn" [disabled]="signupForm.invalid || isSubmitting">
+          <span *ngIf="isSubmitting" class="spinner-small"></span>
+          <span *ngIf="!isSubmitting">S'inscrire</span>
+        </button>
+      </div>
+      
+      <div class="form-footer">
+        <p>Vous avez déjà un compte? <a routerLink="/login-livreur">Connectez-vous ici</a></p>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Styles pour le spinner -->
+<style>
+  .spinner-small {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top: 2px solid white;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .close-message {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0 0.5rem;
+    font-size: 1rem;
+    margin-left: auto;
+  }
+</style> 

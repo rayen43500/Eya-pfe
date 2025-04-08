@@ -1,0 +1,625 @@
+<div class="mes-commandes-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Mes commandes</h1>
+      <p class="subtitle">Suivez l'état de vos commandes en temps réel</p>
+    </div>
+    
+    <div class="actions">
+      <button class="back-button" (click)="backToShop()">
+        <i class="fas fa-arrow-left"></i> Retour à la boutique
+      </button>
+      
+      <div class="search-box">
+        <input 
+          type="text" 
+          placeholder="Rechercher une commande..." 
+          [(ngModel)]="searchTerm"
+          (input)="search()">
+        <i class="fas fa-search"></i>
+      </div>
+      
+      <div class="status-filter">
+        <label for="status-select">Filtrer par statut:</label>
+        <select id="status-select" [(ngModel)]="statusFilter" (change)="search()">
+          <option value="">Tous les statuts</option>
+          <option value="pending">En attente</option>
+          <option value="processing">En traitement</option>
+          <option value="shipped">Expédiée</option>
+          <option value="delivered">Livrée</option>
+          <option value="cancelled">Annulée</option>
+        </select>
+      </div>
+      
+      <button class="refresh-btn" (click)="refreshOrders()" title="Rafraîchir">
+        <i class="fas fa-sync-alt"></i> Actualiser
+      </button>
+    </div>
+  </div>
+
+  <!-- État de chargement -->
+  <div *ngIf="isLoading" class="loading-state">
+    <div class="spinner"></div>
+    <p>Chargement des commandes...</p>
+  </div>
+  
+  <!-- Message d'erreur -->
+  <div *ngIf="error" class="error-message">
+    <i class="fas fa-exclamation-triangle"></i>
+    <span>{{ error }}</span>
+    <button class="retry-btn" (click)="refreshOrders()">
+      <i class="fas fa-redo"></i> Réessayer
+    </button>
+  </div>
+  
+  <!-- Tableau des commandes -->
+  <div *ngIf="!isLoading && !error && filteredOrders.length > 0" class="orders-table-container">
+    <table class="orders-table">
+      <thead>
+        <tr>
+          <th>Commande</th>
+          <th>Date</th>
+          <th>Articles</th>
+          <th>Total</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let order of filteredOrders">
+          <td class="order-id" (click)="showOrderDetails(order)">#{{ order.id }}</td>
+          <td>{{ formatDate(order.created_at) }}</td>
+          <td>{{ order.total_products }} article(s)</td>
+          <td class="amount-cell">{{ order.total_amount | currency:'EUR' }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="getStatusClass(order.status)">
+              {{ order.status_display }}
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- État vide -->
+  <div *ngIf="!isLoading && !error && filteredOrders.length === 0" class="empty-state">
+    <i class="fas fa-shopping-bag"></i>
+    <h3>Vous n'avez pas encore de commandes</h3>
+    <p>Découvrez notre boutique et passez votre première commande</p>
+    <button class="shop-now-btn" (click)="backToShop()">
+      <i class="fas fa-store"></i> Visiter la boutique
+    </button>
+  </div>
+</div>
+
+<!-- Modal des détails de commande -->
+<div *ngIf="selectedOrder" class="order-details-modal">
+  <div class="modal-header">
+    <h2>Détails de la commande #{{ selectedOrder.id }}</h2>
+    <button class="close-modal" (click)="closeOrderDetails()">&times;</button>
+  </div>
+  
+  <div class="modal-body">
+    <div class="order-summary">
+      <div class="summary-row">
+        <span class="label">Date:</span>
+        <span class="value">{{ formatDate(selectedOrder.created_at) }}</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">Statut:</span>
+        <span class="value">
+          <span class="status-badge" [ngClass]="getStatusClass(selectedOrder.status)">
+            {{ selectedOrder.status_display }}
+          </span>
+        </span>
+      </div>
+      <div class="summary-row">
+        <span class="label">Total:</span>
+        <span class="value">{{ selectedOrder.total_amount | currency:'EUR' }}</span>
+      </div>
+    </div>
+    
+    <div class="shipping-info" *ngIf="selectedOrder.shipping_address">
+      <h3>Adresse de livraison</h3>
+      <p>
+        <span *ngIf="selectedOrder.shipping_address.full_name">{{ selectedOrder.shipping_address.full_name }}<br></span>
+        {{ selectedOrder.shipping_address.address }}<br>
+        {{ selectedOrder.shipping_address.postal_code }} {{ selectedOrder.shipping_address.city }}<br>
+        {{ selectedOrder.shipping_address.country }}
+        <span *ngIf="selectedOrder.shipping_address.phone"><br>Tél: {{ selectedOrder.shipping_address.phone }}</span>
+      </p>
+    </div>
+    
+    <!-- Informations de livraison avec le code -->
+    <div class="delivery-info">
+      <h3>Informations de livraison</h3>
+      <div *ngIf="selectedOrder.livreur" class="livreur-info">
+        <p><strong>Livreur:</strong> {{ selectedOrder.livreur.username }}</p>
+        <p><strong>Contact:</strong> {{ selectedOrder.livreur.email }}</p>
+      </div>
+      <div class="delivery-code">
+        <div class="code-section">
+          <h4>Code de livraison</h4>
+          <div class="code-display" [ngClass]="{'code-pending': !selectedOrder.delivery_code}">
+            <span class="code-value">{{ selectedOrder.delivery_code || 'Génération en cours...' }}</span>
+          </div>
+          <div class="code-info">
+            <p class="code-instructions">Communiquez ce code au livreur pour valider la livraison</p>
+            <p class="code-status" [class.validated]="selectedOrder.is_code_validated">
+              {{ selectedOrder.is_code_validated ? 'Code validé' : 'En attente de validation' }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Liste des articles -->
+    <div class="order-items">
+      <h3>Articles commandés</h3>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Produit</th>
+            <th>Quantité</th>
+            <th>Prix unitaire</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of selectedOrder.items">
+            <td>{{ item.product_name }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.price | currency:'EUR' }}</td>
+            <td>{{ item.quantity * item.price | currency:'EUR' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay pour le modal -->
+<div *ngIf="selectedOrder" class="modal-overlay" (click)="closeOrderDetails()"></div>
+
+<style>
+  .mes-commandes-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    font-family: 'Roboto', sans-serif;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .header-content h1 {
+    font-size: 2rem;
+    margin: 0;
+    color: #333;
+  }
+
+  .subtitle {
+    color: #666;
+    margin: 0.5rem 0 0;
+  }
+
+  .actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .back-button {
+    background-color: #f5f5f5;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.3s;
+  }
+
+  .back-button:hover {
+    background-color: #e0e0e0;
+  }
+
+  .search-box {
+    position: relative;
+  }
+
+  .search-box input {
+    padding: 0.5rem;
+    padding-left: 2rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 250px;
+  }
+
+  .search-box i {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+  }
+
+  .status-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .status-filter select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+  }
+
+  .refresh-btn {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.3s;
+  }
+
+  .refresh-btn:hover {
+    background-color: #1976D2;
+  }
+
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top-color: #2196F3;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .error-message {
+    background-color: #fde8e8;
+    color: #d32f2f;
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .retry-btn {
+    margin-left: auto;
+    background-color: #d32f2f;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  .retry-btn:hover {
+    background-color: #b71c1c;
+  }
+
+  .orders-table-container {
+    overflow-x: auto;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .orders-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .orders-table th {
+    background-color: #f5f5f5;
+    text-align: left;
+    padding: 1rem;
+    font-weight: 500;
+    color: #333;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .orders-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+    color: #666;
+  }
+
+  .order-id {
+    font-weight: 700;
+    color: #333;
+  }
+
+  .amount-cell {
+    font-weight: 700;
+    color: #333;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: capitalize;
+  }
+
+  .status-pending {
+    background-color: #fff8e1;
+    color: #ffa000;
+  }
+
+  .status-processing {
+    background-color: #e3f2fd;
+    color: #1976d2;
+  }
+
+  .status-shipped {
+    background-color: #e8f5e9;
+    color: #388e3c;
+  }
+
+  .status-delivered {
+    background-color: #e8f5e9;
+    color: #388e3c;
+  }
+
+  .status-cancelled {
+    background-color: #feecef;
+    color: #e53935;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .empty-state i {
+    font-size: 3rem;
+    color: #999;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state h3 {
+    margin: 0 0 0.5rem;
+    color: #333;
+  }
+
+  .empty-state p {
+    color: #666;
+    margin-bottom: 1.5rem;
+  }
+
+  .shop-now-btn {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    transition: background-color 0.3s;
+  }
+
+  .shop-now-btn:hover {
+    background-color: #388E3C;
+  }
+
+  @media screen and (max-width: 768px) {
+    .page-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .actions {
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    .search-box input {
+      width: 100%;
+    }
+  }
+
+  /* Styles pour le modal de détails de commande */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+  }
+
+  .order-details-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    z-index: 1001;
+  }
+
+  .modal-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #eaeaea;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .close-modal {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #6c757d;
+  }
+
+  .modal-body {
+    padding: 20px;
+  }
+
+  .order-summary {
+    margin-bottom: 20px;
+  }
+
+  .summary-row {
+    display: flex;
+    margin-bottom: 10px;
+  }
+
+  .summary-row .label {
+    width: 100px;
+    font-weight: 600;
+    color: #495057;
+  }
+
+  .shipping-info, .order-items, .delivery-info {
+    margin-bottom: 20px;
+  }
+
+  .shipping-info h3, .order-items h3, .delivery-info h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 15px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eaeaea;
+  }
+
+  .items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+
+  .items-table th, .items-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #eaeaea;
+  }
+
+  .items-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+  }
+
+  .delivery-info {
+    margin: 20px 0;
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+  }
+
+  .code-section {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+  }
+
+  .code-display {
+    background-color: #fff;
+    padding: 1rem;
+    border-radius: 6px;
+    border: 2px solid #e9ecef;
+    margin: 1rem 0;
+    text-align: center;
+  }
+
+  .code-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #2196F3;
+    letter-spacing: 2px;
+  }
+
+  .code-pending .code-value {
+    color: #6c757d;
+    font-style: italic;
+  }
+
+  .code-info {
+    margin-top: 1rem;
+  }
+
+  .code-instructions {
+    color: #495057;
+    margin-bottom: 0.5rem;
+  }
+
+  .code-status {
+    color: #dc3545;
+    font-weight: 500;
+  }
+
+  .code-status.validated {
+    color: #28a745;
+  }
+
+  .order-id {
+    cursor: pointer;
+    color: #2196F3;
+    text-decoration: underline;
+  }
+
+  .order-id:hover {
+    color: #0D47A1;
+  }
+</style>

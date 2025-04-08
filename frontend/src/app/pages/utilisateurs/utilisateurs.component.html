@@ -1,0 +1,196 @@
+<div class="users-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Gestion des Utilisateurs</h1>
+      <p class="subtitle">Gérez les utilisateurs, leurs rôles et leurs permissions</p>
+    </div>
+    
+    <div class="actions">
+      <button class="add-btn" (click)="openModal()">
+        <i class="fas fa-plus"></i> Ajouter un utilisateur
+      </button>
+    </div>
+  </div>
+
+  <!-- Message de succès -->
+  <div *ngIf="success" class="success-message">
+    <i class="fas fa-check-circle"></i>
+    <span>{{ success }}</span>
+    <button class="close-btn" (click)="success = ''">×</button>
+  </div>
+  
+  <!-- Message d'erreur -->
+  <div *ngIf="error" class="error-message">
+    <i class="fas fa-exclamation-triangle"></i>
+    <span>{{ error }}</span>
+    <button class="close-btn" (click)="error = ''">×</button>
+  </div>
+  
+  <!-- État de chargement -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="spinner"></div>
+    <p>Chargement...</p>
+  </div>
+  
+  <!-- Tableau des utilisateurs -->
+  <div *ngIf="!loading && users.length > 0" class="users-table-container">
+    <table class="users-table">
+      <thead>
+        <tr>
+          <th>Utilisateur</th>
+          <th>Email</th>
+          <th>Prénom</th>
+          <th>Nom</th>
+          <th>Rôle</th>
+          <th>Date d'inscription</th>
+          <th>Dernière connexion</th>
+          <th>Actif</th>
+          <th>Admin</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let user of users">
+          <td>{{ user.username }}</td>
+          <td>{{ user.email }}</td>
+          <td>{{ user.first_name || '-' }}</td>
+          <td>{{ user.last_name || '-' }}</td>
+          <td>
+            <select 
+              class="role-select" 
+              [value]="user.role"
+              (change)="changeRole(user, $event)"
+            >
+              <option *ngFor="let role of roleOptions" [value]="role.value">{{ role.label }}</option>
+            </select>
+          </td>
+          <td>{{ user.date_joined | date:'dd/MM/yyyy' }}</td>
+          <td>{{ user.last_login ? (user.last_login | date:'dd/MM/yyyy') : 'Jamais' }}</td>
+          <td>
+            <div class="toggle-switch">
+              <input type="checkbox" id="active-{{ user.id }}" [checked]="user.is_active" (change)="toggleActive(user)">
+              <label for="active-{{ user.id }}"></label>
+            </div>
+          </td>
+          <td>
+            <div class="toggle-switch">
+              <input type="checkbox" id="staff-{{ user.id }}" [checked]="user.is_staff" (change)="toggleStaff(user)">
+              <label for="staff-{{ user.id }}"></label>
+            </div>
+          </td>
+          <td class="actions-cell">
+            <button class="action-btn edit-btn" (click)="openModal(user)" title="Modifier">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="action-btn pwd-btn" (click)="resetPassword(user)" title="Réinitialiser le mot de passe">
+              <i class="fas fa-key"></i>
+            </button>
+            <button class="action-btn delete-btn" (click)="deleteUser(user.id)" title="Supprimer">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- État vide -->
+  <div *ngIf="!loading && users.length === 0" class="empty-state">
+    <i class="fas fa-users"></i>
+    <h3>Aucun utilisateur trouvé</h3>
+    <p>Commencez par ajouter un utilisateur</p>
+    <button class="add-btn" (click)="openModal()">
+      <i class="fas fa-plus"></i> Ajouter un utilisateur
+    </button>
+  </div>
+  
+  <!-- Modal d'ajout/édition d'utilisateur -->
+  <div class="modal-backdrop" *ngIf="showModal" (click)="closeModal()"></div>
+  <div class="user-form-modal" *ngIf="showModal">
+    <div class="modal-header">
+      <h2>{{ isEditing ? 'Modifier l\'utilisateur' : 'Ajouter un utilisateur' }}</h2>
+      <button class="close-modal" (click)="closeModal()">&times;</button>
+    </div>
+    
+    <div class="modal-body">
+      <form [formGroup]="userForm" (ngSubmit)="saveUser()">
+        <div class="form-group">
+          <label for="username">Nom d'utilisateur *</label>
+          <input type="text" id="username" formControlName="username" [class.invalid]="usernameControl?.invalid && usernameControl?.touched">
+          <div *ngIf="usernameControl?.invalid && usernameControl?.touched" class="error-hint">
+            {{ getErrorMessage('username') }}
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="email">Email *</label>
+          <input type="email" id="email" formControlName="email" [class.invalid]="emailControl?.invalid && emailControl?.touched">
+          <div *ngIf="emailControl?.invalid && emailControl?.touched" class="error-hint">
+            {{ getErrorMessage('email') }}
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="password">{{ isEditing ? 'Mot de passe (laisser vide pour ne pas modifier)' : 'Mot de passe *' }}</label>
+            <input type="password" id="password" formControlName="password" [class.invalid]="passwordControl?.invalid && passwordControl?.touched">
+            <div *ngIf="passwordControl?.invalid && passwordControl?.touched" class="error-hint">
+              {{ getErrorMessage('password') }}
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="password2">{{ isEditing ? 'Confirmer le mot de passe (si modifié)' : 'Confirmer le mot de passe *' }}</label>
+            <input type="password" id="password2" formControlName="password2" [class.invalid]="password2Control?.invalid && password2Control?.touched">
+            <div *ngIf="password2Control?.invalid && password2Control?.touched" class="error-hint">
+              {{ getErrorMessage('password2') }}
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="first_name">Prénom</label>
+            <input type="text" id="first_name" formControlName="first_name">
+          </div>
+          
+          <div class="form-group">
+            <label for="last_name">Nom</label>
+            <input type="text" id="last_name" formControlName="last_name">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="role">Rôle *</label>
+          <select id="role" formControlName="role">
+            <option *ngFor="let role of roleOptions" [value]="role.value">{{ role.label }}</option>
+          </select>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" formControlName="is_active">
+              Compte actif
+            </label>
+          </div>
+          
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" formControlName="is_staff">
+              Administrateur (accès à l'interface d'admin)
+            </label>
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="cancel-btn" (click)="closeModal()">Annuler</button>
+          <button type="submit" class="submit-btn" [disabled]="userForm.invalid || loading">
+            <span *ngIf="loading" class="spinner-sm"></span>
+            {{ isEditing ? 'Mettre à jour' : 'Ajouter' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,146 @@
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow">
+        <div class="card-header bg-primary text-white text-center">
+          <h3>Inscription Livreur</h3>
+        </div>
+        <div class="card-body">
+          <div *ngIf="successMessage" class="alert alert-success">
+            {{ successMessage }}
+          </div>
+          <div *ngIf="errorMessage" class="alert alert-danger">
+            <p *ngFor="let line of errorMessage.split('\n')">{{ line }}</p>
+          </div>
+          
+          <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
+            <!-- Nom d'utilisateur -->
+            <div class="mb-3">
+              <label for="username" class="form-label">Nom d'utilisateur</label>
+              <input 
+                type="text" 
+                id="username" 
+                formControlName="username" 
+                class="form-control" 
+                [ngClass]="{'is-invalid': registerForm.get('username')?.invalid && registerForm.get('username')?.touched}"
+              >
+              <div class="invalid-feedback" *ngIf="registerForm.get('username')?.errors?.['required'] && registerForm.get('username')?.touched">
+                Le nom d'utilisateur est requis
+              </div>
+              <div class="invalid-feedback" *ngIf="registerForm.get('username')?.errors?.['minlength'] && registerForm.get('username')?.touched">
+                Le nom d'utilisateur doit contenir au moins 3 caractères
+              </div>
+            </div>
+            
+            <!-- Email -->
+            <div class="mb-3">
+              <label for="email" class="form-label">Adresse email</label>
+              <input 
+                type="email" 
+                id="email" 
+                formControlName="email" 
+                class="form-control" 
+                [ngClass]="{'is-invalid': registerForm.get('email')?.invalid && registerForm.get('email')?.touched}"
+              >
+              <div class="invalid-feedback" *ngIf="registerForm.get('email')?.errors?.['required'] && registerForm.get('email')?.touched">
+                L'adresse email est requise
+              </div>
+              <div class="invalid-feedback" *ngIf="registerForm.get('email')?.errors?.['email'] && registerForm.get('email')?.touched">
+                Format d'email invalide
+              </div>
+            </div>
+            
+            <!-- Numéro de téléphone -->
+            <div class="mb-3">
+              <label for="phone_number" class="form-label">Numéro de téléphone</label>
+              <input 
+                type="tel" 
+                id="phone_number" 
+                formControlName="phone_number" 
+                class="form-control"
+                placeholder="Ex: 0612345678"
+                [ngClass]="{'is-invalid': registerForm.get('phone_number')?.invalid && registerForm.get('phone_number')?.touched}"
+              >
+              <div class="invalid-feedback" *ngIf="registerForm.get('phone_number')?.errors?.['required'] && registerForm.get('phone_number')?.touched">
+                Le numéro de téléphone est requis
+              </div>
+              <div class="invalid-feedback" *ngIf="registerForm.get('phone_number')?.errors?.['pattern'] && registerForm.get('phone_number')?.touched">
+                Format de numéro de téléphone invalide
+              </div>
+            </div>
+            
+            <!-- Type de véhicule -->
+            <div class="mb-3">
+              <label for="vehicle_type" class="form-label">Type de véhicule</label>
+              <select 
+                id="vehicle_type" 
+                formControlName="vehicle_type" 
+                class="form-select"
+                [ngClass]="{'is-invalid': registerForm.get('vehicle_type')?.invalid && registerForm.get('vehicle_type')?.touched}"
+              >
+                <option *ngFor="let type of vehicleTypes" [value]="type.value">{{ type.label }}</option>
+              </select>
+              <div class="invalid-feedback" *ngIf="registerForm.get('vehicle_type')?.errors?.['required'] && registerForm.get('vehicle_type')?.touched">
+                Le type de véhicule est requis
+              </div>
+            </div>
+            
+            <!-- Mot de passe -->
+            <div class="mb-3">
+              <label for="password1" class="form-label">Mot de passe</label>
+              <input 
+                type="password" 
+                id="password1" 
+                formControlName="password1" 
+                class="form-control" 
+                [ngClass]="{'is-invalid': registerForm.get('password1')?.invalid && registerForm.get('password1')?.touched}"
+              >
+              <div class="invalid-feedback" *ngIf="registerForm.get('password1')?.errors?.['required'] && registerForm.get('password1')?.touched">
+                Le mot de passe est requis
+              </div>
+              <div class="invalid-feedback" *ngIf="registerForm.get('password1')?.errors?.['minlength'] && registerForm.get('password1')?.touched">
+                Le mot de passe doit contenir au moins 8 caractères
+              </div>
+            </div>
+            
+            <!-- Confirmation du mot de passe -->
+            <div class="mb-3">
+              <label for="password2" class="form-label">Confirmer le mot de passe</label>
+              <input 
+                type="password" 
+                id="password2" 
+                formControlName="password2" 
+                class="form-control" 
+                [ngClass]="{'is-invalid': (registerForm.get('password2')?.invalid || registerForm.errors?.['mismatch']) && registerForm.get('password2')?.touched}"
+              >
+              <div class="invalid-feedback" *ngIf="registerForm.get('password2')?.errors?.['required'] && registerForm.get('password2')?.touched">
+                La confirmation du mot de passe est requise
+              </div>
+              <div class="invalid-feedback" *ngIf="registerForm.errors?.['mismatch'] && registerForm.get('password2')?.touched">
+                Les mots de passe ne correspondent pas
+              </div>
+            </div>
+            
+            <!-- Bouton d'inscription -->
+            <div class="d-grid gap-2 mt-4">
+              <button type="submit" class="btn btn-primary" [disabled]="registerForm.invalid || isLoading">
+                <span *ngIf="isLoading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                S'inscrire
+              </button>
+            </div>
+          </form>
+          
+          <div class="text-center mt-3">
+            <p>
+              Déjà un compte livreur ? <a routerLink="/login-livreur">Se connecter</a>
+            </p>
+            <p>
+              <a routerLink="/login-client">Espace client</a> | 
+              <a routerLink="/login">Espace administrateur</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div> 

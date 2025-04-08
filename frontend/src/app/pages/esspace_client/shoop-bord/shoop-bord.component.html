@@ -1,0 +1,314 @@
+<div class="shop-container">
+  <!-- Bannière hero avec message plus clair et plus moderne -->
+  <div class="hero-banner">
+    <div class="hero-content">
+      <h1>Découvrez notre collection exclusive</h1>
+      <p>Des produits de qualité supérieure sélectionnés pour vous</p>
+      <button class="cta-button"><i class="fas fa-shopping-bag"></i> Découvrir maintenant</button>
+    </div>
+  </div>
+
+  <!-- Section principale -->
+  <div class="main-content">
+    <!-- Sidebar avec filtres -->
+    <aside class="filters-sidebar">
+      <div class="sidebar-section">
+        <h3><i class="fas fa-tag"></i> Catégories</h3>
+        <ul class="category-list">
+          <li [class.active]="selectedCategory === 'all'"
+              (click)="selectCategory('all')">
+            <i class="fas fa-globe"></i>
+            <span>Toutes les catégories</span>
+          </li>
+          <li *ngFor="let category of categories" 
+              [class.active]="selectedCategory === category.name"
+              (click)="selectCategory(category.name)">
+            <i class="fas" [ngClass]="category.icon || 'fa-tag'"></i>
+            <span>{{ category.name }}</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="sidebar-section">
+        <h3><i class="fas fa-euro-sign"></i> Fourchette de prix</h3>
+        <div class="price-slider">
+          <input type="range" 
+                 min="0" 
+                 [max]="maxPrice" 
+                 [(ngModel)]="priceRange[0]"
+                 (change)="filterProducts()">
+          <input type="range" 
+                 min="0" 
+                 [max]="maxPrice" 
+                 [(ngModel)]="priceRange[1]"
+                 (change)="filterProducts()">
+          <div class="price-range-display">
+            <span>{{ priceRange[0] | currency:'EUR' }}</span>
+            <span>{{ priceRange[1] | currency:'EUR' }}</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Zone principale des produits -->
+    <div class="product-area">
+      <!-- Barre d'outils supérieure -->
+      <div class="toolbar">
+        <div class="search-bar">
+          <i class="fas fa-search"></i>
+          <input type="text" 
+                 [formControl]="searchControl" 
+                 placeholder="Que recherchez-vous aujourd'hui ?">
+        </div>
+
+        <div class="toolbar-actions">
+          <button class="action-button" routerLink="/mes-commandes">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Mes commandes</span>
+          </button>
+
+          <div class="sort-options">
+            <select (change)="changeSortOption($event)" [value]="sortOption">
+              <option value="default">Trier par : Nouveautés</option>
+              <option value="price-asc">Prix : Croissant</option>
+              <option value="price-desc">Prix : Décroissant</option>
+              <option value="name-asc">Nom : A-Z</option>
+              <option value="name-desc">Nom : Z-A</option>
+              <option value="rating">Meilleures évaluations</option>
+            </select>
+          </div>
+
+          <button class="cart-button" (click)="toggleCart()">
+            <i class="fas fa-shopping-cart"></i>
+            <span class="cart-count" *ngIf="getCartItemCount() > 0">{{ getCartItemCount() }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- État de chargement -->
+      <div *ngIf="loading" class="loading-state">
+        <div class="spinner"></div>
+        <p>Chargement de votre collection...</p>
+      </div>
+
+      <!-- Message d'erreur -->
+      <div *ngIf="error" class="error-message">
+        <i class="fas fa-exclamation-circle"></i>
+        <p>{{ error }}</p>
+        <button (click)="loadProducts()">Réessayer</button>
+      </div>
+
+      <!-- Grille des produits avec design moderne -->
+      <div *ngIf="!loading && !error" class="product-grid">
+        <div *ngFor="let product of displayedProducts" class="product-card">
+          <div class="product-image">
+            <img [src]="product.image || 'assets/images/placeholder.png'" [alt]="product.name">
+            <div *ngIf="product.discount_percentage" class="discount-badge">
+              -{{ product.discount_percentage }}%
+            </div>
+          </div>
+          
+          <div class="product-info">
+            <div>
+              <div class="product-category">
+                <i class="fas" [ngClass]="getCategoryIcon(product.category)"></i>
+                {{ product.category }}
+              </div>
+              <h3 class="product-name">{{ product.name }}</h3>
+              
+              <div class="product-rating">
+                <div class="stars">
+                  <ng-container *ngFor="let star of [1,2,3,4,5]">
+                    <i class="fas fa-star" *ngIf="star <= (product.rating || 0)"></i>
+                    <i class="far fa-star" *ngIf="star > (product.rating || 0)"></i>
+                  </ng-container>
+                </div>
+                <span class="rating-count" *ngIf="product.rating">
+                  ({{ product.rating }})
+                </span>
+              </div>
+            </div>
+            
+            <div>
+              <div class="product-price">
+                <span *ngIf="product.discount_percentage" class="original-price">{{ product.price | currency:'EUR' }}</span>
+                <span class="final-price" [ngClass]="{'promotion-price': product.discount_percentage && product.discount_percentage > 0}">
+                  {{ product.final_price || product.price | currency:'EUR' }}
+                </span>
+              </div>
+              
+              <div class="product-stock" [class.in-stock]="product.stock > 0" [class.out-of-stock]="product.stock === 0">
+                <i class="fas" [ngClass]="{'fa-check-circle': product.stock > 0, 'fa-times-circle': product.stock === 0}"></i>
+                {{ product.stock > 0 ? 'En stock' : 'Rupture de stock' }}
+              </div>
+            </div>
+          </div>
+          
+          <div class="product-actions">
+            <button class="view-details-btn" [routerLink]="['/product', product.id]">
+              <i class="fas fa-eye"></i> Détails
+            </button>
+            <button class="add-to-cart-btn" 
+                    (click)="addToCart(product)"
+                    [disabled]="product.stock === 0">
+              <i class="fas fa-cart-plus"></i> Ajouter
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div *ngIf="!loading && !error && filteredProducts.length > 0" class="pagination-container">
+        <div class="pagination">
+          <button class="pagination-button" (click)="previousPage()" [disabled]="currentPage === 1">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          
+          <ng-container *ngIf="totalPages <= 7">
+            <button *ngFor="let page of getPagesArray()" 
+                    class="pagination-button" 
+                    [class.active]="page === currentPage"
+                    (click)="changePage(page)">
+              {{ page }}
+            </button>
+          </ng-container>
+          
+          <ng-container *ngIf="totalPages > 7">
+            <!-- Première page -->
+            <button *ngIf="currentPage > 3" 
+                    class="pagination-button" 
+                    (click)="changePage(1)">
+              1
+            </button>
+            
+            <!-- Ellipsis au début -->
+            <span *ngIf="currentPage > 4" class="pagination-ellipsis">...</span>
+            
+            <!-- Pages autour de la page actuelle -->
+            <ng-container *ngFor="let page of getPagesArray()">
+              <button *ngIf="page >= currentPage - 2 && page <= currentPage + 2" 
+                      class="pagination-button" 
+                      [class.active]="page === currentPage"
+                      (click)="changePage(page)">
+                {{ page }}
+              </button>
+            </ng-container>
+            
+            <!-- Ellipsis à la fin -->
+            <span *ngIf="currentPage < totalPages - 3" class="pagination-ellipsis">...</span>
+            
+            <!-- Dernière page -->
+            <button *ngIf="currentPage < totalPages - 2" 
+                    class="pagination-button" 
+                    (click)="changePage(totalPages)">
+              {{ totalPages }}
+            </button>
+          </ng-container>
+          
+          <button class="pagination-button" (click)="nextPage()" [disabled]="currentPage === totalPages">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+        
+        <div class="pagination-info">
+          <span>Page {{ currentPage }} sur {{ totalPages }}</span>
+          <span>Affichage de {{ (currentPage - 1) * itemsPerPage + 1 }} à {{ getLastDisplayedIndex() }} sur {{ filteredProducts.length }} produits</span>
+        </div>
+      </div>
+
+      <!-- Message si aucun produit ne correspond aux filtres -->
+      <div *ngIf="!loading && !error && filteredProducts.length === 0" class="no-products">
+        <i class="fas fa-search"></i>
+        <h3>Aucun produit ne correspond à votre recherche</h3>
+        <p>Essayez d'élargir vos critères ou modifiez vos filtres pour trouver ce que vous cherchez.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bouton flottant du panier pour mobile -->
+  <button class="floating-cart-button" (click)="toggleCart()" *ngIf="getCartItemCount() > 0">
+    <i class="fas fa-shopping-cart"></i>
+    <span class="floating-cart-count">{{ getCartItemCount() }}</span>
+  </button>
+
+  <!-- Mini-panier redessiné et modernisé -->
+  <div class="mini-cart" [class.active]="showCartComponent">
+    <div class="cart-header">
+      <h3><i class="fas fa-shopping-bag"></i> Votre panier</h3>
+      <button class="close-cart-btn" (click)="closeCartComponent()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="cart-content">
+      <div class="cart-items" *ngIf="cartItems.length > 0">
+        <div class="cart-item" *ngFor="let item of cartItems">
+          <div class="item-image">
+            <img [src]="item.product.image || 'assets/images/placeholder.png'" [alt]="item.product.name">
+            <div class="item-quantity">{{item.quantity}}</div>
+          </div>
+          <div class="item-details">
+            <h4>{{item.product.name}}</h4>
+            <div class="item-price">
+              <span class="price">
+                <i class="fas fa-tag"></i> {{item.product.final_price || item.product.price | currency:'EUR'}} / unité
+              </span>
+              <span class="total">
+                <i class="fas fa-euro-sign"></i> Total: {{(item.product.final_price || item.product.price) * item.quantity | currency:'EUR'}}
+              </span>
+            </div>
+          </div>
+          <div class="item-actions">
+            <div class="quantity-controls">
+              <button class="quantity-btn" (click)="updateQuantity(item.product.id, -1)" [disabled]="item.quantity <= 1">
+                <i class="fas fa-minus"></i>
+              </button>
+              <span class="quantity">{{item.quantity}}</span>
+              <button class="quantity-btn" (click)="updateQuantity(item.product.id, 1)" [disabled]="item.quantity >= item.product.stock">
+                <i class="fas fa-plus"></i>
+              </button>
+            </div>
+            <button class="remove-btn" (click)="removeFromCart(item.product.id)" title="Supprimer">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- État du panier vide amélioré -->
+      <div class="empty-cart" *ngIf="cartItems.length === 0">
+        <i class="fas fa-shopping-cart"></i>
+        <h3>Votre panier est vide</h3>
+        <p>Ajoutez des produits pour commencer à magasiner</p>
+        <button class="continue-shopping" (click)="closeCartComponent()">
+          <i class="fas fa-arrow-left"></i> Continuer vos achats
+        </button>
+      </div>
+    </div>
+    
+    <!-- Pied de panier avec résumé amélioré -->
+    <div class="cart-footer" *ngIf="cartItems.length > 0">
+      <div class="cart-summary">
+        <div class="summary-row">
+          <span><i class="fas fa-shopping-basket"></i> Sous-total</span>
+          <span>{{getCartSubtotal() | currency:'EUR'}}</span>
+        </div>
+        <div class="summary-row">
+          <span><i class="fas fa-truck"></i> Livraison</span>
+          <span>{{shippingCost | currency:'EUR'}}</span>
+        </div>
+        <div class="summary-row total">
+          <span><i class="fas fa-receipt"></i> Total</span>
+          <span>{{getCartTotal() | currency:'EUR'}}</span>
+        </div>
+      </div>
+      
+      <button class="checkout-btn" (click)="checkout()">
+        <i class="fas fa-lock"></i> Passer à la caisse
+      </button>
+    </div>
+  </div>
+
+  <!-- Overlay de fond sombre quand le panier est ouvert -->
+  <div class="cart-overlay" [class.active]="showCartComponent" (click)="closeCartComponent()"></div>
+</div>

@@ -1,0 +1,190 @@
+<div class="container">
+    <div class="form-card">
+      <h2 class="form-title">{{ editMode ? 'Modifier le produit' : 'Ajouter un produit' }}</h2>
+      
+      <div *ngIf="successMessage" class="alert success-alert">
+        <div class="alert-icon">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="alert-content">
+          <h4>Succès!</h4>
+          <p>{{ successMessage }}</p>
+          <div class="progress-bar success-progress">
+            <div class="progress-fill" [style.width.%]="redirectProgress"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div *ngIf="errorMessage" class="alert error-alert">
+        <div class="alert-icon">
+          <i class="fas fa-exclamation-circle"></i>
+        </div>
+        <div class="alert-content">
+          <h4>Erreur</h4>
+          <p>{{ errorMessage }}</p>
+        </div>
+        <button class="close-alert" (click)="errorMessage = ''">×</button>
+      </div>
+      
+      <div *ngIf="loading && editMode" class="loading-spinner-container">
+        <div class="spinner"></div>
+        <p>Chargement des informations du produit...</p>
+      </div>
+      
+      <form *ngIf="!loading || !editMode" [formGroup]="productForm" (ngSubmit)="onSubmit()" class="product-form">
+        <div class="form-layout">
+          <div class="form-column">
+            <div class="form-group">
+              <label for="name">Nom du produit <span class="required">*</span></label>
+              <input 
+                type="text" 
+                id="name" 
+                formControlName="name" 
+                class="form-control"
+                [ngClass]="{'invalid': submitted && f['name'].errors}">
+              <div *ngIf="submitted && f['name'].errors" class="error-message">
+                <span *ngIf="f['name'].errors && f['name'].errors['required']">Le nom est obligatoire</span>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="category">Catégorie <span class="required">*</span></label>
+              <select 
+                id="category" 
+                formControlName="category" 
+                class="form-control"
+                [ngClass]="{'invalid': submitted && f['category'].errors}">
+                <option value="">Sélectionner une catégorie</option>
+                <option *ngFor="let category of categories" [value]="category.name">
+                  {{ category.name }}
+                </option>
+              </select>
+              <div *ngIf="submitted && f['category'].errors" class="error-message">
+                <span *ngIf="f['category'].errors && f['category'].errors['required']">La catégorie est obligatoire</span>
+              </div>
+              <div class="category-info">
+                <a [routerLink]="['/categories']" class="add-category-link">
+                  <i class="fas fa-plus-circle"></i> Gérer les catégories
+                </a>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="price">Prix <span class="required">*</span></label>
+              <div class="input-with-icon">
+                <span class="input-icon">€</span>
+                <input 
+                  type="number" 
+                  id="price" 
+                  formControlName="price" 
+                  class="form-control with-icon"
+                  [ngClass]="{'invalid': submitted && f['price'].errors}">
+              </div>
+              <div *ngIf="submitted && f['price'].errors" class="error-message">
+                <span *ngIf="f['price'].errors && f['price'].errors['required']">Le prix est obligatoire</span>
+                <span *ngIf="f['price'].errors && f['price'].errors['min']">Le prix doit être positif</span>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="quantity">Quantité <span class="required">*</span></label>
+              <input 
+                type="number" 
+                id="quantity" 
+                formControlName="quantity" 
+                class="form-control"
+                [ngClass]="{'invalid': submitted && f['quantity'].errors}">
+              <div *ngIf="submitted && f['quantity'].errors" class="error-message">
+                <span *ngIf="f['quantity'].errors && f['quantity'].errors['required']">La quantité est obligatoire</span>
+                <span *ngIf="f['quantity'].errors && f['quantity'].errors['min']">La quantité doit être positive</span>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="status">Statut du produit</label>
+              <select 
+                id="status" 
+                formControlName="status" 
+                class="form-control">
+                <option value="available">Disponible</option>
+                <option value="out_of_stock">Épuisé</option>
+                <option value="hidden">Non visible</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-column">
+            <div class="form-group">
+              <label for="description">Description <span class="required">*</span></label>
+              <textarea 
+                id="description" 
+                formControlName="description" 
+                rows="4"
+                class="form-control"
+                [ngClass]="{'invalid': submitted && f['description'].errors}"></textarea>
+              <div *ngIf="submitted && f['description'].errors" class="error-message">
+                <span *ngIf="f['description'].errors && f['description'].errors['required']">La description est obligatoire</span>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label>Image du produit</label>
+              <div class="image-upload-container" [ngClass]="{'has-image': imagePreview, 'has-error': uploadError}">
+                <input 
+                  type="file"
+                  id="image"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  (change)="onFileSelected($event)"
+                  class="file-input"
+                  #fileInput>
+                
+                <div class="upload-placeholder" *ngIf="!imagePreview">
+                  <div class="upload-icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                  </div>
+                  <p>Cliquez ou glissez une image ici</p>
+                  <p class="file-hint">JPG, PNG, GIF, WEBP • Max 5 MB</p>
+                  <button type="button" class="browse-btn" (click)="fileInput.click()">Parcourir</button>
+                </div>
+                
+                <div class="image-preview-container" *ngIf="imagePreview">
+                  <img [src]="imagePreview" alt="Prévisualisation de l'image" class="preview-image">
+                  <div class="image-actions">
+                    <span class="file-name" *ngIf="selectedFile">{{ selectedFile.name }}</span>
+                    <button type="button" class="remove-image-btn" (click)="removeImage()">
+                      <i class="fas fa-times"></i> Supprimer
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div *ngIf="uploadProgress > 0 && uploadProgress < 100" class="upload-progress">
+                <div class="progress-bar">
+                  <div class="progress-fill" [style.width.%]="uploadProgress"></div>
+                </div>
+                <span class="progress-text">{{ uploadProgress }}%</span>
+              </div>
+              
+              <div *ngIf="uploadError" class="error-message upload-error">
+                <i class="fas fa-exclamation-circle"></i> {{ uploadError }}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="btn secondary" (click)="resetForm()">
+            <i class="fas fa-times"></i> Annuler
+          </button>
+          <button type="submit" class="btn primary" [disabled]="loading || (uploadProgress > 0 && uploadProgress < 100)">
+            <i class="fas fa-save"></i>
+            <span *ngIf="!loading && (uploadProgress === 0 || uploadProgress === 100)">
+              {{ editMode ? 'Enregistrer les modifications' : 'Ajouter le produit' }}
+            </span>
+            <span *ngIf="uploadProgress > 0 && uploadProgress < 100">Téléchargement en cours...</span>
+            <span *ngIf="loading" class="loader"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div> 

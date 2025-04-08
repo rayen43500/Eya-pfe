@@ -1,0 +1,231 @@
+<div class="admin-orders-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Gestion des commandes</h1>
+      <p class="subtitle">Gérez et suivez toutes les commandes</p>
+    </div>
+    
+    <div class="actions">
+      <div class="search-box">
+        <input 
+          type="text" 
+          placeholder="Rechercher une commande..." 
+          [(ngModel)]="searchTerm"
+          (input)="search()">
+        <i class="fas fa-search"></i>
+      </div>
+      
+      <div class="status-filter">
+        <label for="status-select">Filtrer par statut:</label>
+        <select id="status-select" [(ngModel)]="statusFilter" (change)="search()">
+          <option *ngFor="let option of statusOptions" [value]="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
+      
+      <button class="refresh-btn" (click)="refreshOrders()" title="Rafraîchir">
+        <i class="fas fa-sync-alt"></i> Actualiser
+      </button>
+    </div>
+  </div>
+
+  <!-- État de chargement -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="spinner"></div>
+    <p>Chargement des commandes...</p>
+  </div>
+  
+  <!-- Message d'erreur -->
+  <div *ngIf="error" class="error-message">
+    <i class="fas fa-exclamation-triangle"></i>
+    <span>{{ error }}</span>
+    <button class="retry-btn" (click)="refreshOrders()">
+      <i class="fas fa-redo"></i> Réessayer
+    </button>
+  </div>
+  
+  <!-- Tableau des commandes -->
+  <div *ngIf="!loading && !error && filteredOrders.length > 0" class="orders-table-container">
+    <table class="orders-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Client</th>
+          <th>Date</th>
+          <th>Total</th>
+          <th>Statut</th>
+          <th>Livreur</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let order of filteredOrders">
+          <td class="order-id">#{{ order.id }}</td>
+          <td>{{ order.client_info?.username }}</td>
+          <td>{{ formatDate(order.created_at) }}</td>
+          <td class="amount-cell">{{ order.total_amount | currency:'EUR' }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="getStatusClass(order.status)">
+              {{ getStatusLabel(order.status) }}
+            </span>
+          </td>
+          <td>
+            <span *ngIf="order.livreur">{{ order.livreur.username }}</span>
+            <span *ngIf="!order.livreur" class="no-livreur">Non assigné</span>
+          </td>
+          <td>
+            <button class="btn btn-primary" (click)="showOrderDetails(order)">
+              <i class="fas fa-eye"></i> Voir détails
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- État vide -->
+  <div *ngIf="!loading && !error && filteredOrders.length === 0" class="empty-state">
+    <i class="fas fa-box-open"></i>
+    <h3>Aucune commande trouvée</h3>
+    <p *ngIf="statusFilter">Aucune commande avec le statut sélectionné</p>
+    <p *ngIf="searchTerm">Aucune commande ne correspond à votre recherche</p>
+    <p *ngIf="!statusFilter && !searchTerm">Aucune commande n'a encore été passée</p>
+  </div>
+</div>
+
+<!-- Modal des détails de commande -->
+<div *ngIf="selectedOrder" class="order-details-modal">
+  <div class="modal-header">
+    <h2>Détails de la commande #{{ selectedOrder.id }}</h2>
+    <div class="header-actions">
+      <button class="btn btn-primary save-btn" (click)="saveOrderChanges()" [disabled]="isSaving">
+        <i class="fas" [ngClass]="isSaving ? 'fa-spinner fa-spin' : 'fa-save'"></i>
+        Enregistrer
+      </button>
+      <button class="btn btn-primary close-btn" (click)="closeOrderDetails()">
+        <i class="fas fa-times"></i>
+        Fermer
+      </button>
+    </div>
+  </div>
+  
+  <div class="modal-body">
+    <div class="order-summary">
+      <div class="summary-row">
+        <span class="label">Client:</span>
+        <span class="value">{{ selectedOrder.client_info?.username }}</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">Email:</span>
+        <span class="value">{{ selectedOrder.client_info?.email }}</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">Date:</span>
+        <span class="value">{{ formatDate(selectedOrder.created_at) }}</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">Statut:</span>
+        <span class="value">
+          <select [(ngModel)]="tempStatus" class="form-control">
+            <option *ngFor="let option of statusOptions" [value]="option.value" [disabled]="option.value === ''">
+              {{ option.label }}
+            </option>
+          </select>
+        </span>
+      </div>
+      <div class="summary-row">
+        <span class="label">Livreur:</span>
+        <span class="value">
+          <select [(ngModel)]="tempLivreur" class="form-control">
+            <option [ngValue]="null">-- Non assigné --</option>
+            <option *ngFor="let livreur of livreurs" [ngValue]="livreur.id">
+              {{ livreur.username }} ({{ livreur.vehicle_type }})
+            </option>
+          </select>
+        </span>
+      </div>
+      <div class="summary-row">
+        <span class="label">Total:</span>
+        <span class="value">{{ selectedOrder.total_amount | currency:'EUR' }}</span>
+      </div>
+    </div>
+
+    <!-- Message de succès -->
+    <div *ngIf="saveSuccess" class="alert alert-success mt-2">
+      <i class="fas fa-check-circle"></i> Modifications enregistrées avec succès.
+    </div>
+
+    <!-- Message d'erreur -->
+    <div *ngIf="saveError" class="alert alert-danger mt-2">
+      <i class="fas fa-exclamation-triangle"></i> {{ saveError }}
+    </div>
+
+    <div class="shipping-info" *ngIf="selectedOrder.shipping_address">
+      <h3>Adresse de livraison</h3>
+      <p>
+        <span *ngIf="selectedOrder.shipping_address.full_name">{{ selectedOrder.shipping_address.full_name }}<br></span>
+        {{ selectedOrder.shipping_address.address }}<br>
+        {{ selectedOrder.shipping_address.postal_code }} {{ selectedOrder.shipping_address.city }}<br>
+        {{ selectedOrder.shipping_address.country }}
+        <span *ngIf="selectedOrder.shipping_address.phone"><br>Tél: {{ selectedOrder.shipping_address.phone }}</span>
+      </p>
+    </div>
+
+    <div class="payment-details">
+      <h3>Détails du paiement</h3>
+      <div class="payment-row">
+        <span class="label">Sous-total produits:</span>
+        <span class="value">{{ selectedOrder.total_amount | currency:'EUR' }}</span>
+      </div>
+      <div class="payment-row">
+        <span class="label">TVA (20%):</span>
+        <span class="value">{{ selectedOrder.total_amount * 0.2 | currency:'EUR' }}</span>
+      </div>
+      <div class="payment-row">
+        <span class="label">Frais de livraison:</span>
+        <span class="value">0,00 €</span>
+      </div>
+      <div class="payment-row total">
+        <span class="label">Total TTC:</span>
+        <span class="value">{{ selectedOrder.total_amount | currency:'EUR' }}</span>
+      </div>
+    </div>
+
+    <div class="order-items">
+      <h3>Articles commandés ({{ selectedOrder.total_products }} articles)</h3>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Produit</th>
+            <th>Prix unitaire</th>
+            <th>Quantité</th>
+            <th>Sous-total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of selectedOrder.items">
+            <td>{{ item.product_name }}</td>
+            <td>{{ item.price | currency:'EUR' }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.price * item.quantity | currency:'EUR' }}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3">Total</td>
+            <td>{{ selectedOrder.total_amount | currency:'EUR' }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="close-btn" (click)="closeOrderDetails()">Fermer</button>
+      <button class="close-btn" (click)="saveOrderChanges()" [disabled]="isSaving">enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay pour le modal -->
+<div *ngIf="selectedOrder" class="modal-overlay" (click)="closeOrderDetails()"></div> 

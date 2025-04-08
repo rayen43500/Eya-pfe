@@ -1,0 +1,182 @@
+<div class="produits-container">
+  <!-- Notification de succès -->
+  <div *ngIf="productAdded" class="success-notification">
+    <div class="notification-content">
+      <i class="fas fa-check-circle"></i>
+      <span>Produit ajouté avec succès!</span>
+    </div>
+    <button class="close-notification" (click)="productAdded = false">×</button>
+  </div>
+  
+  <!-- En-tête avec titre et bouton d'ajout -->
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">Catalogue des produits</h1>
+      <p class="page-subtitle">Gérez tous vos produits en un seul endroit</p>
+    </div>
+    
+    <button class="add-product-btn" (click)="addProduct()">
+      <i class="fas fa-plus"></i> Ajouter un produit
+    </button>
+  </div>
+  
+  <!-- Barre de filtrage et recherche -->
+  <div class="filter-navbar">
+    <div class="filter-section">
+      <label for="category-filter">Catégorie</label>
+      <select id="category-filter" (change)="filterByCategory($event)" class="filter-select">
+        <option value="all">Toutes les catégories</option>
+        <option *ngFor="let category of categories" [value]="category">{{ getCategoryLabel(category) }}</option>
+      </select>
+    </div>
+    
+    <div class="filter-section">
+      <label for="price-range">Prix maximum</label>
+      <div class="price-range">
+        <input type="range" id="price-range" [min]="0" [max]="maxPrice" [(ngModel)]="priceFilter" (input)="filterByPrice()">
+        <span class="price-value">{{ priceFilter > 0 ? 'Jusqu\'à ' + (priceFilter | currency:'EUR') : 'Tous les prix' }}</span>
+      </div>
+    </div>
+    
+    <div class="filter-section">
+      <label for="sort-by">Trier par</label>
+      <select id="sort-by" (change)="sortProducts($event)" class="filter-select">
+        <option value="nameAsc">Nom (A-Z)</option>
+        <option value="nameDesc">Nom (Z-A)</option>
+        <option value="priceAsc">Prix croissant</option>
+        <option value="priceDesc">Prix décroissant</option>
+        <option value="newest">Plus récents</option>
+        <option value="oldest">Plus anciens</option>
+      </select>
+    </div>
+    
+    <div class="filter-section search">
+      <label for="search">Recherche</label>
+      <div class="search-input">
+        <i class="fas fa-search"></i>
+        <input type="text" id="search" placeholder="Rechercher un produit..." [(ngModel)]="searchTerm" (input)="filterBySearch()">
+        <button *ngIf="searchTerm" class="clear-search" (click)="clearSearch()">×</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Badges des filtres actifs -->
+  <div class="active-filters" *ngIf="filtersActive">
+    <div class="filter-summary">
+      <span>Filtres actifs:</span>
+    </div>
+    <div class="filter-badges">
+      <span class="filter-badge" *ngIf="activeCategory !== 'all'">
+        Catégorie: {{ getCategoryLabel(activeCategory) }}
+        <button (click)="clearCategoryFilter()">×</button>
+      </span>
+      <span class="filter-badge" *ngIf="priceFilter < maxPrice">
+        Prix: jusqu'à {{ priceFilter | currency:'EUR' }}
+        <button (click)="clearPriceFilter()">×</button>
+      </span>
+      <span class="filter-badge" *ngIf="searchTerm">
+        Recherche: "{{ searchTerm }}"
+        <button (click)="clearSearch()">×</button>
+      </span>
+    </div>
+    <button class="reset-filters" (click)="resetFilters()">
+      <i class="fas fa-undo"></i> Tout réinitialiser
+    </button>
+  </div>
+  
+  <!-- Indicateur de chargement -->
+  <div *ngIf="loading" class="loading-container">
+    <div class="spinner"></div>
+    <p>Chargement des produits...</p>
+  </div>
+  
+  <!-- Message d'erreur -->
+  <div *ngIf="error" class="error-container">
+    <div class="error-icon">
+      <i class="fas fa-exclamation-triangle"></i>
+    </div>
+    <div class="error-message">
+      <h3>Un problème est survenu</h3>
+      <p>{{ error }}</p>
+      <button class="retry-btn" (click)="loadProducts()">Réessayer</button>
+    </div>
+  </div>
+  
+  <!-- Information sur les résultats -->
+  <div *ngIf="!loading && !error && filteredProducts.length > 0" class="results-info">
+    <span>{{ filteredProducts.length }} produit(s) trouvé(s)</span>
+    <span *ngIf="filtersActive" class="filter-info">avec les filtres appliqués</span>
+  </div>
+  
+  <!-- Grille des produits -->
+  <div *ngIf="!loading && !error && filteredProducts.length > 0" class="products-grid">
+    <div class="product-card" *ngFor="let product of filteredProducts">
+      <div class="product-img">
+        <img *ngIf="product.image" 
+             [src]="getImageUrl(product.image)" 
+             [alt]="product.name"
+             (error)="handleImageError($event)">
+        <div *ngIf="!product.image" class="no-image">
+          <i class="fas fa-image"></i>
+        </div>
+        
+        <div class="product-badge" *ngIf="product.status">
+          <span [ngClass]="'status-' + product.status">
+            {{ getStatusLabel(product.status) }}
+          </span>
+        </div>
+      </div>
+      
+      <div class="product-content">
+        <span class="product-category">{{ getCategoryLabel(product.category) }}</span>
+        <h3 class="product-name">{{ product.name }}</h3>
+        <p class="product-description">{{ product.description }}</p>
+        
+        <div class="product-footer">
+          <div class="product-price">{{ product.price | currency:'EUR' }}</div>
+          <div class="product-quantity" *ngIf="product.quantity">
+            <span [ngClass]="{'low-stock': product.quantity < 5}">
+              {{ product.quantity }} en stock
+            </span>
+          </div>
+        </div>
+        
+        <div class="product-actions">
+          <button class="action-btn view-btn" title="Voir le détail">
+            <i class="fas fa-eye"></i>
+          </button>
+          <button class="action-btn edit-btn" (click)="editProduct(product.id)" title="Modifier">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button class="action-btn delete-btn" (click)="deleteProduct(product.id)" title="Supprimer">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Message quand aucun produit n'existe -->
+  <div *ngIf="!loading && !error && products.length === 0" class="empty-state">
+    <div class="empty-icon">
+      <i class="fas fa-box-open"></i>
+    </div>
+    <h3>Aucun produit disponible</h3>
+    <p>Commencez par ajouter votre premier produit au catalogue.</p>
+    <button class="add-product-btn" (click)="addProduct()">
+      <i class="fas fa-plus"></i> Ajouter un produit
+    </button>
+  </div>
+  
+  <!-- Message quand aucun résultat ne correspond aux filtres -->
+  <div *ngIf="!loading && !error && products.length > 0 && filteredProducts.length === 0" class="no-results">
+    <div class="no-results-icon">
+      <i class="fas fa-filter"></i>
+    </div>
+    <h3>Aucun résultat trouvé</h3>
+    <p>Aucun produit ne correspond à vos critères de recherche.</p>
+    <button class="reset-filters-btn" (click)="resetFilters()">
+      <i class="fas fa-undo"></i> Réinitialiser les filtres
+    </button>
+  </div>
+</div>

@@ -1,0 +1,242 @@
+<div class="container-fluid p-4">
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center">
+        <h2 class="mb-3">Tableau de bord statistique</h2>
+        <button class="btn btn-outline-secondary" routerLink="/dashboard">
+          <i class="fas fa-arrow-left me-2"></i> Retour au dashboard
+        </button>
+      </div>
+      
+      <!-- Sélecteur de période -->
+      <div class="btn-group mb-4">
+        <button class="btn" [class.btn-primary]="selectedPeriod === 'daily'" 
+          [class.btn-outline-primary]="selectedPeriod !== 'daily'"
+          (click)="onPeriodChange('daily')">Jour</button>
+        <button class="btn" [class.btn-primary]="selectedPeriod === 'weekly'" 
+          [class.btn-outline-primary]="selectedPeriod !== 'weekly'"
+          (click)="onPeriodChange('weekly')">Semaine</button>
+        <button class="btn" [class.btn-primary]="selectedPeriod === 'monthly'" 
+          [class.btn-outline-primary]="selectedPeriod !== 'monthly'"
+          (click)="onPeriodChange('monthly')">Mois</button>
+        <button class="btn" [class.btn-primary]="selectedPeriod === 'yearly'" 
+          [class.btn-outline-primary]="selectedPeriod !== 'yearly'"
+          (click)="onPeriodChange('yearly')">Année</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Message de chargement -->
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Chargement...</span>
+    </div>
+    <p class="mt-2">Chargement des statistiques...</p>
+  </div>
+
+  <!-- Message d'erreur -->
+  <div *ngIf="error && !loading" class="alert alert-danger">
+    {{ error }}
+  </div>
+
+  <!-- Contenu des statistiques -->
+  <div *ngIf="!loading && !error && stats" class="dashboard-content">
+    <!-- Cartes de résumé -->
+    <div class="row mb-4">
+      <div class="col-md-3 mb-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title text-muted">Ventes totales</h5>
+            <h3 class="card-text">{{ formatAmount(stats.totalSales || 0) }}</h3>
+            <div *ngIf="stats.salesTrend" class="mt-2">
+              <span [class.text-success]="stats.salesTrend.isPositive" 
+                    [class.text-danger]="!stats.salesTrend.isPositive">
+                <i [class]="stats.salesTrend.isPositive ? 'fas fa-arrow-up' : 'fas fa-arrow-down'"></i>
+                {{ stats.salesTrend.percentage }}%
+              </span>
+              <small class="text-muted ms-1">vs période précédente</small>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title text-muted">Commandes</h5>
+            <h3 class="card-text">{{ stats.totalOrders || 0 }}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title text-muted">Clients</h5>
+            <h3 class="card-text">{{ stats.totalCustomers || 0 }}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title text-muted">Panier moyen</h5>
+            <h3 class="card-text">{{ formatAmount(stats.averageOrderValue || 0) }}</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graphique simplifié des ventes dans le temps -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card shadow-sm">
+          <div class="card-header">
+            Évolution des ventes par période
+          </div>
+          <div class="card-body">
+            <div *ngIf="stats.salesOverTime && stats.salesOverTime.length > 0 && stats.salesOverTime[0].series.length > 0">
+              <!-- Graphique simplifié avec barres de progression -->
+              <div class="mb-4">
+                <div class="row align-items-center mb-3" *ngFor="let point of stats.salesOverTime[0].series; let i = index">
+                  <div class="col-md-2 col-3 text-end">
+                    <span class="small">{{ point.name }}</span>
+                  </div>
+                  <div class="col-md-8 col-7">
+                    <div class="progress" style="height: 20px;">
+                      <div class="progress-bar" 
+                          [style.width.%]="(point.value / getMaxValue(stats.salesOverTime[0].series)) * 100"
+                          [style.background-color]="getBarColor(i)">
+                        {{ formatAmount(point.value) }}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-2 col-2">
+                    <span class="badge bg-light text-dark">{{ formatAmount(point.value) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="!stats.salesOverTime || stats.salesOverTime.length === 0 || stats.salesOverTime[0].series.length === 0" class="text-center py-5 text-muted">
+              <i class="fas fa-chart-line fa-3x mb-3"></i>
+              <p>Aucune donnée disponible pour cette période</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ventes par catégorie et par région -->
+    <div class="row">
+      <!-- Ventes par catégorie -->
+      <div class="col-md-6 mb-4">
+        <div class="card shadow-sm">
+          <div class="card-header">
+            Ventes par catégorie
+          </div>
+          <div class="card-body">
+            <div *ngIf="stats.categorySales && stats.categorySales.length > 0">
+              <div class="mb-3" *ngFor="let category of stats.categorySales; let i = index">
+                <div class="d-flex justify-content-between mb-1">
+                  <span>{{ category.name }}</span>
+                  <span>{{ formatAmount(category.value) }}</span>
+                </div>
+                <div class="progress" style="height: 12px;">
+                  <div class="progress-bar" 
+                      [style.width.%]="(category.value / getTotalCategoryValue()) * 100"
+                      [style.background-color]="getBarColor(i)">
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="!stats.categorySales || stats.categorySales.length === 0" class="text-center py-5 text-muted">
+              <i class="fas fa-chart-pie fa-3x mb-3"></i>
+              <p>Aucune donnée disponible pour les catégories</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ventes par région -->
+      <div class="col-md-6 mb-4">
+        <div class="card shadow-sm">
+          <div class="card-header">
+            Ventes par région
+          </div>
+          <div class="card-body">
+            <div *ngIf="stats.revenueByRegion && getRegionData().length > 0">
+              <div class="mb-3" *ngFor="let region of getRegionData(); let i = index">
+                <div class="d-flex justify-content-between mb-1">
+                  <span>{{ region.name }}</span>
+                  <span>{{ formatAmount(region.value) }}</span>
+                </div>
+                <div class="progress" style="height: 12px;">
+                  <div class="progress-bar" 
+                      [style.width.%]="(region.value / getMaxRegionValue()) * 100"
+                      [style.background-color]="getBarColor(i + 5)">
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="!stats.revenueByRegion || getRegionData().length === 0" class="text-center py-5 text-muted">
+              <i class="fas fa-map-marker-alt fa-3x mb-3"></i>
+              <p>Aucune donnée disponible par région</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Produits les plus vendus -->
+    <div class="row">
+      <div class="col-12 mb-4">
+        <div class="card shadow-sm">
+          <div class="card-header">
+            Top produits
+          </div>
+          <div class="card-body">
+            <div *ngIf="stats.topProducts && stats.topProducts.length > 0" class="table-responsive">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>Produit</th>
+                    <th>Ventes</th>
+                    <th>Chiffre d'affaires</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let product of stats.topProducts">
+                    <td class="d-flex align-items-center">
+                      <img [src]="product.image" 
+                           alt="{{ product.name }}" 
+                           class="img-thumbnail me-2" 
+                           style="width: 50px; height: 50px;"
+                           onerror="this.src='https://via.placeholder.com/50'">
+                      <span>{{ product.name }}</span>
+                    </td>
+                    <td>{{ product.sales }}</td>
+                    <td>{{ formatAmount(product.revenue) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div *ngIf="!stats.topProducts || stats.topProducts.length === 0" class="text-center py-5 text-muted">
+              <i class="fas fa-box fa-3x mb-3"></i>
+              <p>Aucun produit vendu sur cette période</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Bouton d'exportation -->
+    <div class="row mt-4">
+      <div class="col-12 text-center">
+        <button class="btn btn-primary me-2" (click)="refreshStats()">
+          <i class="fas fa-sync-alt me-2"></i> Actualiser
+        </button>
+        <button class="btn btn-outline-secondary" (click)="exportStats()">
+          <i class="fas fa-file-export me-2"></i> Exporter en PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

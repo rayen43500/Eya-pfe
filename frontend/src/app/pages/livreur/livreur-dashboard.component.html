@@ -1,0 +1,805 @@
+<div *ngIf="error" class="error-container">
+  <mat-card class="error-card">
+    <mat-card-content>
+      <div class="error-icon">
+        <mat-icon>error_outline</mat-icon>
+      </div>
+      <div class="error-message">
+        <h3>Erreur de chargement</h3>
+        <p>{{error}}</p>
+      </div>
+      <button mat-raised-button color="primary" (click)="loadShippedDeliveries()" class="dev-button">
+        <mat-icon>refresh</mat-icon>
+        Réessayer
+      </button>
+    </mat-card-content>
+  </mat-card>
+</div>
+
+<!-- Contenu principal -->
+<div class="dashboard-container" [class.hidden]="error">
+  <!-- En-tête du tableau de bord -->
+  <div class="dashboard-header">
+    <h1>Tableau de bord Livreur</h1>
+    <button mat-raised-button color="primary" (click)="loadShippedDeliveries()" [disabled]="loading" class="dev-button">
+      <mat-icon>refresh</mat-icon>
+      Actualiser
+    </button>
+  </div>
+
+  <!-- Statistiques -->
+  <div class="stats-container">
+    <mat-card class="stat-card">
+      <mat-card-content>
+        <div class="stat-icon">
+          <mat-icon>today</mat-icon>
+        </div>
+        <div class="stat-info">
+          <h3>Livraisons du jour</h3>
+          <p class="stat-value">{{deliveryStats.today}}</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <mat-card-content>
+        <div class="stat-icon">
+          <mat-icon>local_shipping</mat-icon>
+        </div>
+        <div class="stat-info">
+          <h3>À livrer</h3>
+          <p class="stat-value">{{deliveryStats.inProgress}}</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <mat-card-content>
+        <div class="stat-icon">
+          <mat-icon>check_circle</mat-icon>
+        </div>
+        <div class="stat-info">
+          <h3>Livrées aujourd'hui</h3>
+          <p class="stat-value">{{deliveryStats.completed}}</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Tableau des commandes -->
+  <mat-card class="deliveries-table-card">
+    <mat-card-header>
+      <mat-card-title>Commandes à livrer</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <!-- Indicateur de chargement -->
+      <div *ngIf="loading" class="loading-container">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p class="loading-text">Chargement des livraisons...</p>
+      </div>
+
+      <!-- Tableau des commandes -->
+      <div *ngIf="!loading" class="table-container">
+        <table class="deliveries-table" *ngIf="shippedDeliveries.length > 0">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Client</th>
+              <th>Date</th>
+              <th>Produits</th>
+              <th>Total</th>
+              <th>Statut</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let delivery of shippedDeliveries">
+              <td>#{{delivery.order_number}}</td>
+              <td>{{delivery.customer_name}}</td>
+              <td>{{formatDate(delivery.delivery_date)}}</td>
+              <td>{{delivery.products_count}}</td>
+              <td>{{formatAmount(delivery.total_amount)}}</td>
+              <td>
+                <div class="status-chip status-shipped">
+                  Expédiée
+                </div>
+              </td>
+              <td class="actions-cell">
+                <button mat-raised-button color="primary" (click)="markAsDelivered(delivery.id)" [disabled]="loading">
+                  <mat-icon>check_circle</mat-icon>
+                  Livrer
+                </button>
+                <button mat-raised-button color="warn" (click)="cancelDelivery(delivery.id)" [disabled]="loading">
+                  <mat-icon>cancel</mat-icon>
+                  Annuler
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Message si aucune commande -->
+        <div *ngIf="!loading && shippedDeliveries.length === 0" class="no-deliveries">
+          <mat-icon>inbox</mat-icon>
+          <p>Aucune commande à livrer pour le moment</p>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
+
+<!-- Styles pour l'animation de confirmation de livraison -->
+<style>
+  .delivery-confirmation-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    backdrop-filter: blur(5px);
+  }
+  
+  .delivery-confirmation-overlay.visible {
+    opacity: 1;
+  }
+  
+  .confirmation-content {
+    background-color: white;
+    padding: 3rem;
+    border-radius: 16px;
+    text-align: center;
+    max-width: 80%;
+    transform: scale(0.8);
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  }
+  
+  .delivery-confirmation-overlay.visible .confirmation-content {
+    transform: scale(1);
+  }
+  
+  .confirmation-icon {
+    font-size: 5rem;
+    color: #4CAF50;
+    margin-bottom: 1.5rem;
+    animation: pulse-success 2s infinite;
+  }
+  
+  .confirmation-content h2 {
+    color: #2E7D32;
+    font-size: 2.2rem;
+    margin-bottom: 1rem;
+    font-weight: 700;
+  }
+  
+  .confirmation-message {
+    color: #555;
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .confirmation-details {
+    background-color: #F1F8E9;
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 1.5rem;
+  }
+  
+  .earnings-info {
+    color: #2E7D32;
+    font-weight: 700;
+    font-size: 1.3rem;
+    margin: 0.5rem 0;
+  }
+  
+  /* Styles pour les confettis */
+  .confetti-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 9999;
+    overflow: hidden;
+  }
+  
+  .confetti {
+    position: absolute;
+    top: -20px;
+    border-radius: 0;
+    animation: fall 3s linear forwards;
+  }
+  
+  @keyframes fall {
+    0% {
+      top: -20px;
+      transform: rotate(0deg) translateX(0);
+    }
+    
+    25% {
+      transform: rotate(45deg) translateX(30px);
+    }
+    
+    50% {
+      transform: rotate(90deg) translateX(-30px);
+    }
+    
+    75% {
+      transform: rotate(135deg) translateX(30px);
+    }
+    
+    100% {
+      top: 100vh;
+      transform: rotate(180deg) translateX(-30px);
+    }
+  }
+  
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(3px);
+  }
+  
+  .spinner {
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #4CAF50;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1.5rem;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  @keyframes pulse-success {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.9; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  
+  .validation-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(3px);
+  }
+
+  .modal-content {
+    background-color: white;
+    border-radius: 16px;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+    width: 90%;
+    max-width: 500px;
+    padding: 2rem;
+    animation: modal-in 0.3s ease;
+    position: relative;
+  }
+
+  @keyframes modal-in {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  
+  .close-modal {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 1.5rem;
+    color: #999;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  .close-modal:hover {
+    color: #333;
+  }
+
+  .order-id {
+    display: inline-block;
+    background-color: #f1f8e9;
+    color: #558b2f;
+    padding: 0.5rem 1rem;
+    border-radius: 30px;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+  }
+
+  .client-info, .delivery-address {
+    background-color: #f5f5f5;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .client-info h4, .delivery-address h4 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.1rem;
+  }
+
+  .instructions {
+    color: #555;
+    font-style: italic;
+    margin: 1.5rem 0;
+  }
+
+  .validation-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .validation-code-container {
+    position: relative;
+    width: 100%;
+  }
+
+  .validation-input {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.5rem;
+    text-align: center;
+    letter-spacing: 0.5rem;
+    border: 2px solid #ddd;
+    border-radius: 12px;
+    transition: all 0.3s;
+    background-color: #f9f9f9;
+  }
+
+  .validation-input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+    background-color: white;
+  }
+
+  .validation-focus-border {
+    position: absolute;
+    bottom: 0;
+    left: 10%;
+    width: 80%;
+    height: 3px;
+    background-color: #4CAF50;
+    transform: scaleX(0);
+    transition: transform 0.3s;
+  }
+
+  .validation-input:focus + .validation-focus-border {
+    transform: scaleX(1);
+  }
+
+  .submit-btn {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 1rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .submit-btn:hover {
+    background-color: #388E3C;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .submit-btn:disabled {
+    background-color: #9E9E9E;
+    transform: none;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+
+  .validation-help {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px dashed #ddd;
+    font-size: 0.9rem;
+    color: #666;
+  }
+
+  .validation-help code {
+    background-color: #f5f5f5;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    color: #d32f2f;
+  }
+  
+  /* Styles pour fermer les messages */
+  .close-message {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0 0.5rem;
+    font-size: 1rem;
+  }
+
+  /* Styles pour les boutons d'action */
+  .validate-btn, .accept-btn, .map-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.8rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin: 0.5rem 0;
+    text-decoration: none;
+    border: none;
+    gap: 0.5rem;
+    width: 100%;
+  }
+  
+  .validate-btn {
+    background-color: #4CAF50;
+    color: white;
+    box-shadow: 0 4px 6px rgba(76, 175, 80, 0.2);
+  }
+  
+  .validate-btn:hover {
+    background-color: #388E3C;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(76, 175, 80, 0.2);
+  }
+  
+  .accept-btn {
+    background-color: #2196F3;
+    color: white;
+    box-shadow: 0 4px 6px rgba(33, 150, 243, 0.2);
+  }
+  
+  .accept-btn:hover {
+    background-color: #1976D2;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(33, 150, 243, 0.2);
+  }
+  
+  .accept-btn:disabled {
+    background-color: #BDBDBD;
+    transform: none;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+  
+  .map-btn {
+    background-color: #F5F5F5;
+    color: #555;
+    border: 1px solid #DDD;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  
+  .map-btn:hover {
+    background-color: #EEEEEE;
+    color: #333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Animation pour les boutons */
+  .validate-btn i, .accept-btn i {
+    transition: transform 0.3s ease;
+  }
+  
+  .validate-btn:hover i, .accept-btn:hover i {
+    transform: scale(1.2);
+  }
+  
+  @media (min-width: 768px) {
+    .delivery-actions {
+      display: flex;
+      gap: 0.8rem;
+    }
+    
+    .validate-btn, .accept-btn, .map-btn {
+      width: auto;
+    }
+  }
+
+  /* Styles pour les statistiques avancées */
+  .advanced-stats {
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .stats-tabs {
+    display: flex;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  .tab-button {
+    background: none;
+    border: none;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #555;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.3s;
+  }
+
+  .tab-button:hover {
+    color: #2196F3;
+  }
+
+  .tab-button.active {
+    color: #2196F3;
+  }
+
+  .tab-button.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 10%;
+    width: 80%;
+    height: 3px;
+    background-color: #2196F3;
+  }
+
+  .tab-content {
+    display: none;
+  }
+
+  .tab-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Styles pour les statistiques par véhicule */
+  .vehicle-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .vehicle-stat-card {
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+
+  .vehicle-stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  .vehicle-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: #2196F3;
+  }
+
+  .vehicle-icon i {
+    background-color: #e3f2fd;
+    width: 70px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+  }
+
+  .vehicle-stat-card h4 {
+    margin: 0 0 1rem;
+    font-size: 1.2rem;
+    color: #333;
+  }
+
+  .vehicle-stat-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem 1.5rem;
+    width: 100%;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .vehicle-efficiency {
+    width: 100%;
+    position: relative;
+    margin-top: 1rem;
+  }
+
+  .efficiency-bar {
+    height: 6px;
+    background-color: #4CAF50;
+    border-radius: 3px;
+  }
+
+  .efficiency-label {
+    font-size: 0.85rem;
+    color: #555;
+    display: block;
+    text-align: center;
+    margin-top: 0.5rem;
+  }
+
+  /* Styles pour les statistiques par zone */
+  .zone-stats-table-container {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 1.5rem;
+  }
+
+  .zone-stats-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .zone-stats-table th,
+  .zone-stats-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+  }
+
+  .zone-stats-table th {
+    font-weight: 600;
+    color: #333;
+    background-color: #f5f5f5;
+  }
+
+  .zone-stats-table tbody tr:hover {
+    background-color: #f8f8f8;
+  }
+
+  .performance-bar-container {
+    width: 100%;
+    height: 8px;
+    background-color: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .performance-bar {
+    height: 100%;
+    background-color: #4CAF50;
+    border-radius: 4px;
+  }
+
+  .error-container {
+    padding: 2rem;
+    max-width: 600px;
+    margin: 2rem auto;
+  }
+
+  .error-card {
+    background-color: #fff3f3;
+    border: 1px solid #ffcdd2;
+  }
+
+  .error-card mat-card-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .error-icon {
+    color: #f44336;
+    margin-bottom: 1rem;
+  }
+
+  .error-icon mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+  }
+
+  .error-message h3 {
+    color: #d32f2f;
+    margin: 0 0 0.5rem;
+  }
+
+  .error-message p {
+    color: #555;
+    margin: 0 0 1.5rem;
+  }
+
+  .loading-text {
+    margin-top: 1rem;
+    color: #666;
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  .success-snackbar {
+    background-color: #4caf50;
+    color: white;
+  }
+
+  .error-snackbar {
+    background-color: #f44336;
+    color: white;
+  }
+
+  .no-deliveries {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+  }
+
+  .no-deliveries mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+    color: #999;
+  }
+</style> 

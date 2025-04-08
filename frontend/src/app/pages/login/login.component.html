@@ -1,0 +1,45 @@
+<div class="container">
+  <div class="form-container">
+    <h2>Administration</h2>
+    <form (ngSubmit)="login()" #loginForm="ngForm">
+      <div class="form-group">
+        <label for="username">Nom d'utilisateur</label>
+        <input 
+          type="text" 
+          id="username" 
+          name="username" 
+          [(ngModel)]="user.username" 
+          required>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Mot de passe</label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          [(ngModel)]="user.password" 
+          required>
+      </div>
+
+      <div class="error-message" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </div>
+
+      <button type="submit" [disabled]="!loginForm.form.valid || loading">
+        <span *ngIf="loading">Connexion en cours...</span>
+        <span *ngIf="!loading">Connexion</span>
+      </button>
+      
+      <!-- Bouton de secours pour aller au dashboard après connexion réussie -->
+      <div *ngIf="loginSuccess" class="success-message">
+        <p>Connexion réussie! Si vous n'êtes pas redirigé automatiquement:</p>
+        <button type="button" (click)="goToDashboard()" class="dashboard-btn">
+          Accéder au Dashboard
+        </button>
+      </div>
+      <p class="register-link">Vous n'avez pas de compte? <a routerLink="/register">S'inscrire ici</a></p>
+      <p class="client-link">Vous êtes un client? <a routerLink="/login-client">Se connecter en tant que client</a></p>
+    </form>
+  </div>
+</div>

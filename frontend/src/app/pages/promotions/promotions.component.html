@@ -1,0 +1,421 @@
+<div class="promotions-container">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Gestion des Promotions</h1>
+      <p class="subtitle">Créez et gérez les promotions de votre boutique</p>
+    </div>
+    
+    <div class="actions">
+      <button class="add-btn" (click)="openModal()">
+        <i class="fas fa-plus"></i> Créer une promotion
+      </button>
+    </div>
+  </div>
+
+  <!-- Message de succès -->
+  <div *ngIf="success" class="success-message">
+    <i class="fas fa-check-circle"></i>
+    <span>{{ success }}</span>
+    <button class="close-btn" (click)="success = ''">×</button>
+  </div>
+  
+  <!-- Message d'erreur -->
+  <div *ngIf="error" class="error-message">
+    <i class="fas fa-exclamation-triangle"></i>
+    <span>{{ error }}</span>
+    <button class="close-btn" (click)="error = ''">×</button>
+  </div>
+  
+  <!-- Filtres et recherche -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input 
+        type="text" 
+        placeholder="Rechercher une promotion..." 
+        [value]="searchTerm"
+        (input)="onSearch($any($event.target).value)"
+      >
+    </div>
+    
+    <div class="filter-group">
+      <select [value]="selectedType" (change)="onFilterType($any($event.target).value)">
+        <option value="">Tous les types</option>
+        <option value="percentage">Pourcentage</option>
+        <option value="fixed">Montant fixe</option>
+        <option value="free_shipping">Livraison gratuite</option>
+      </select>
+    </div>
+    
+    <div class="filter-group">
+      <select [value]="selectedStatus" (change)="onFilterStatus($any($event.target).value)">
+        <option value="">Tous statuts</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+        <option value="scheduled">Planifiée</option>
+        <option value="expired">Expirée</option>
+      </select>
+    </div>
+  </div>
+  
+  <!-- État de chargement -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="spinner"></div>
+    <p>Chargement des promotions...</p>
+  </div>
+  
+  <!-- Tableau des promotions -->
+  <div *ngIf="!loading && filteredPromotions.length > 0" class="promotions-table-container">
+    <table class="promotions-table">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Description</th>
+          <th>Type</th>
+          <th>Valeur</th>
+          <th>Période</th>
+          <th>Utilisation</th>
+          <th>Statut</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let promotion of filteredPromotions">
+          <td class="code-cell">{{ promotion.code }}</td>
+          <td class="description-cell">
+            <div class="description-title">{{ promotion.description }}</div>
+            <div class="description-details" *ngIf="promotion.details">{{ promotion.details }}</div>
+          </td>
+          <td>{{ promotion.type_display }}</td>
+          <td>{{ promotion.value_display }}</td>
+          <td>{{ promotion.period_display }}</td>
+          <td>{{ promotion.usage_display }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="getStatusClass(promotion.status)">
+              {{ promotion.status_display }}
+            </span>
+          </td>
+          <td class="actions-cell">
+            <button class="action-btn edit-btn" (click)="openModal(promotion)" title="Modifier">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button 
+              class="action-btn toggle-btn" 
+              [ngClass]="{'toggle-active': promotion.status === 'active', 'toggle-inactive': promotion.status !== 'active'}"
+              (click)="toggleStatus(promotion)" 
+              title="Activer/Désactiver"
+              [disabled]="promotion.status === 'expired' || promotion.status === 'scheduled'"
+            >
+              <i [class]="promotion.status === 'active' ? 'fas fa-toggle-on' : 'fas fa-toggle-off'"></i>
+            </button>
+            <button class="action-btn delete-btn" (click)="deletePromotion(promotion.id)" title="Supprimer">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Pagination -->
+  <div *ngIf="totalItems > itemsPerPage" class="pagination">
+    <button 
+      class="pagination-btn" 
+      [disabled]="currentPage === 1"
+      (click)="setPage(currentPage - 1)"
+    >
+      <i class="fas fa-chevron-left"></i>
+    </button>
+    
+    <div class="page-numbers">
+      <button 
+        *ngFor="let page of getPageNumbers()"
+        class="page-number"
+        [class.active]="page === currentPage"
+        (click)="setPage(page)"
+      >
+        {{ page }}
+      </button>
+    </div>
+    
+    <button 
+      class="pagination-btn" 
+      [disabled]="currentPage === getPageNumbers().length"
+      (click)="setPage(currentPage + 1)"
+    >
+      <i class="fas fa-chevron-right"></i>
+    </button>
+  </div>
+  
+  <!-- État vide -->
+  <div *ngIf="!loading && filteredPromotions.length === 0" class="empty-state">
+    <i class="fas fa-ticket-alt"></i>
+    <h3>Aucune promotion trouvée</h3>
+    <p *ngIf="searchTerm || selectedType || selectedStatus">Essayez d'ajuster vos filtres</p>
+    <p *ngIf="!searchTerm && !selectedType && !selectedStatus">Commencez par créer une promotion</p>
+  </div>
+  
+  <!-- Modal de création/édition de promotion -->
+  <div class="modal-backdrop" *ngIf="showModal" (click)="closeModal()"></div>
+  <div class="promotion-form-modal" *ngIf="showModal">
+    <div class="modal-header">
+      <h2>{{ isEditing ? 'Modifier la promotion' : 'Créer une promotion' }}</h2>
+      <button class="close-modal" (click)="closeModal()">&times;</button>
+    </div>
+    
+    <div class="modal-body">
+      <form [formGroup]="promotionForm" (ngSubmit)="savePromotion()">
+        <div class="form-group">
+          <label for="code">Code de promotion *</label>
+          <div class="input-group" style="display: flex; gap: 0.5rem;">
+            <div style="flex: 1;">
+              <input 
+                type="text" 
+                id="code" 
+                formControlName="code" 
+                [class.invalid]="promotionForm.get('code')?.invalid && promotionForm.get('code')?.touched"
+                placeholder="ex: SOLDES2023"
+              >
+            </div>
+            <button 
+              type="button" 
+              class="generate-btn"
+              title="Générer un code automatiquement"
+              (click)="generateCode()"
+              *ngIf="!isEditing"
+            >
+              <i class="fas fa-magic"></i>
+              <span>Générer</span>
+            </button>
+          </div>
+          <div *ngIf="promotionForm.get('code')?.invalid && promotionForm.get('code')?.touched" class="error-hint">
+            Le code de promotion est requis et doit avoir 50 caractères maximum
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="description">Titre de la promotion *</label>
+          <input type="text" id="description" formControlName="description" [class.invalid]="promotionForm.get('description')?.invalid && promotionForm.get('description')?.touched">
+          <div *ngIf="promotionForm.get('description')?.invalid && promotionForm.get('description')?.touched" class="error-hint">
+            La description est requise et doit avoir 100 caractères maximum
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="details">Détails</label>
+          <textarea 
+            id="details" 
+            formControlName="details" 
+            rows="3" 
+            placeholder="Description détaillée de la promotion (optionnel)"
+          ></textarea>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="type">Type de promotion *</label>
+            <select id="type" formControlName="type">
+              <option value="percentage">Pourcentage</option>
+              <option value="fixed">Montant fixe</option>
+              <option value="free_shipping">Livraison gratuite</option>
+            </select>
+          </div>
+          
+          <div class="form-group" *ngIf="promotionForm.get('type')?.value !== 'free_shipping'">
+            <label for="value">Valeur *</label>
+            <div class="input-with-suffix">
+              <input type="number" id="value" formControlName="value" [class.invalid]="promotionForm.get('value')?.invalid && promotionForm.get('value')?.touched">
+              <span class="input-suffix">{{ promotionForm.get('type')?.value === 'percentage' ? '%' : '€' }}</span>
+            </div>
+            <div *ngIf="promotionForm.get('value')?.invalid && promotionForm.get('value')?.touched" class="error-hint">
+              La valeur est requise
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="start_date">Date de début *</label>
+            <input type="date" id="start_date" formControlName="start_date" [class.invalid]="promotionForm.get('start_date')?.invalid && promotionForm.get('start_date')?.touched">
+            <div *ngIf="promotionForm.get('start_date')?.invalid && promotionForm.get('start_date')?.touched" class="error-hint">
+              La date de début est requise
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="end_date">Date de fin *</label>
+            <input type="date" id="end_date" formControlName="end_date" [class.invalid]="promotionForm.get('end_date')?.invalid && promotionForm.get('end_date')?.touched">
+            <div *ngIf="promotionForm.get('end_date')?.invalid && promotionForm.get('end_date')?.touched" class="error-hint">
+              La date de fin est requise
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="usage_limit">Limite d'utilisation (0 = illimité)</label>
+          <input type="number" id="usage_limit" formControlName="usage_limit" min="0">
+        </div>
+        
+        <div class="form-group" *ngIf="isEditing">
+          <label for="status">Statut</label>
+          <select id="status" formControlName="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="scheduled">Planifiée</option>
+          </select>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="cancel-btn" (click)="closeModal()">Annuler</button>
+          <button type="submit" class="submit-btn" [disabled]="promotionForm.invalid || loading">
+            <span *ngIf="loading" class="spinner-sm"></span>
+            {{ isEditing ? 'Mettre à jour' : 'Créer' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Panneau de configuration des promotions -->
+  <div class="admin-dashboard">
+    <div class="dashboard-header">
+      <h1 class="dashboard-title">Gestion des Promotions</h1>
+      <p class="dashboard-subtitle">Créez et gérez des promotions pour vos produits</p>
+    </div>
+
+    <div class="promotion-panels">
+      <!-- Promotion sur tous les produits -->
+      <div class="promotion-panel">
+        <div class="panel-header">
+          <h2><i class="fas fa-percentage"></i> Promotion Globale</h2>
+          <p>Appliquer une réduction à tous les produits</p>
+        </div>
+        <div class="panel-content">
+          <form (ngSubmit)="applyPromotionToAll()" #globalForm="ngForm">
+            <div class="form-group" [class.has-error]="globalPromotion.discountPercentage <= 0 || globalPromotion.discountPercentage > 99">
+              <label for="globalDiscount">Pourcentage de réduction (%) <span class="required">*</span></label>
+              <input type="number" id="globalDiscount" [(ngModel)]="globalPromotion.discountPercentage" 
+                name="globalDiscount" min="1" max="99" required
+                [ngClass]="{'input-error': globalPromotion.discountPercentage <= 0 || globalPromotion.discountPercentage > 99}">
+              <div class="tooltip-error" *ngIf="globalPromotion.discountPercentage <= 0 || globalPromotion.discountPercentage > 99">
+                Le pourcentage doit être entre 1 et 99%
+              </div>
+              <small class="form-hint" *ngIf="globalPromotion.discountPercentage <= 0 || globalPromotion.discountPercentage > 99">
+                Le pourcentage doit être entre 1 et 99%
+              </small>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" [disabled]="loading || globalForm.invalid || globalPromotion.discountPercentage <= 0 || globalPromotion.discountPercentage > 99">
+                <i *ngIf="!loading" class="fas fa-check"></i>
+                <i *ngIf="loading" class="fas fa-spinner fa-spin"></i>
+                {{ loading ? 'Application en cours...' : 'Appliquer à tous les produits' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Promotion par catégorie -->
+      <div class="promotion-panel">
+        <div class="panel-header">
+          <h2><i class="fas fa-tags"></i> Promotion par Catégorie</h2>
+          <p>Appliquer une réduction à une catégorie spécifique</p>
+        </div>
+        <div class="panel-content">
+          <form (ngSubmit)="applyPromotionToCategory()" #categoryForm="ngForm">
+            <div class="form-group" [class.has-error]="categorySubmitted && !categoryPromotion.category">
+              <label for="categorySelect">Catégorie <span class="required">*</span></label>
+              <select id="categorySelect" [(ngModel)]="categoryPromotion.category" name="category" required
+                     [ngClass]="{'input-error': categorySubmitted && !categoryPromotion.category}">
+                <option value="">Sélectionner une catégorie</option>
+                <option *ngFor="let category of categories" [value]="category">{{ category }}</option>
+              </select>
+              <div class="tooltip-error" *ngIf="categorySubmitted && !categoryPromotion.category">
+                Veuillez sélectionner une catégorie
+              </div>
+              <small class="form-hint" *ngIf="categorySubmitted && !categoryPromotion.category">
+                Veuillez sélectionner une catégorie
+              </small>
+            </div>
+            <div class="form-group" [class.has-error]="categoryPromotion.discountPercentage <= 0 || categoryPromotion.discountPercentage > 99">
+              <label for="categoryDiscount">Pourcentage de réduction (%) <span class="required">*</span></label>
+              <input type="number" id="categoryDiscount" [(ngModel)]="categoryPromotion.discountPercentage" 
+                name="categoryDiscount" min="1" max="99" required
+                [ngClass]="{'input-error': categoryPromotion.discountPercentage <= 0 || categoryPromotion.discountPercentage > 99}">
+              <div class="tooltip-error" *ngIf="categoryPromotion.discountPercentage <= 0 || categoryPromotion.discountPercentage > 99">
+                Le pourcentage doit être entre 1 et 99%
+              </div>
+              <small class="form-hint" *ngIf="categoryPromotion.discountPercentage <= 0 || categoryPromotion.discountPercentage > 99">
+                Le pourcentage doit être entre 1 et 99%
+              </small>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" 
+                [disabled]="loading || categoryForm.invalid || !categoryPromotion.category || categoryPromotion.discountPercentage <= 0 || categoryPromotion.discountPercentage > 99">
+                <i *ngIf="!loading" class="fas fa-check"></i>
+                <i *ngIf="loading" class="fas fa-spinner fa-spin"></i>
+                {{ loading ? 'Application en cours...' : 'Appliquer à la catégorie' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Supprimer toutes les promotions -->
+      <div class="promotion-panel">
+        <div class="panel-header danger">
+          <h2><i class="fas fa-trash-alt"></i> Supprimer les Promotions</h2>
+          <p>Annuler toutes les promotions en cours</p>
+        </div>
+        <div class="panel-content">
+          <button (click)="removeAllPromotions()" class="btn btn-danger" [disabled]="loading || !productsOnPromotion.length">
+            <i *ngIf="!loading" class="fas fa-times"></i>
+            <i *ngIf="loading" class="fas fa-spinner fa-spin"></i>
+            {{ loading ? 'Suppression en cours...' : 'Supprimer toutes les promotions' }}
+          </button>
+          <small class="form-hint" *ngIf="!productsOnPromotion.length">
+            Aucune promotion active à supprimer
+          </small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Liste des produits en promotion -->
+    <div class="products-on-promotion" *ngIf="productsOnPromotion.length > 0">
+      <h2 class="section-title">Produits en Promotion</h2>
+      <div class="promotion-grid">
+        <div class="product-card" *ngFor="let product of productsOnPromotion">
+          <span class="discount-badge">-{{product.discount_percentage}}%</span>
+          <div class="product-image">
+            <img [src]="product.image || 'assets/images/placeholder.png'" [alt]="product.name">
+          </div>
+          <div class="product-info">
+            <h3 class="product-name">{{product.name}}</h3>
+            <p class="product-category">{{product.category}}</p>
+            <div class="product-price">
+              <span class="original-price">{{product.price | currency:'EUR'}}</span>
+              <span class="final-price promotion-price">{{product.final_price | currency:'EUR'}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Message si aucune promotion -->
+    <div class="no-promotions" *ngIf="productsOnPromotion.length === 0">
+      <i class="fas fa-info-circle"></i>
+      <p>Aucun produit en promotion actuellement.</p>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" [ngClass]="{'show': showNotification, 'notification-success': notificationSuccess, 'notification-error': !notificationSuccess}">
+      <div class="notification-icon">
+        <i [ngClass]="notificationSuccess ? 'fas fa-check-circle success' : 'fas fa-exclamation-circle error'"></i>
+      </div>
+      <div class="notification-content">
+        <span>{{ notificationMessage }}</span>
+        <div class="notification-progress" *ngIf="showNotification"></div>
+      </div>
+    </div>
+  </div>
+</div>
