@@ -219,6 +219,38 @@ h2 {
   transform: none;
 }
 
+/* Style pour le bouton d'accès sans compte */
+.guest-access-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.guest-access-btn i {
+  margin-right: 8px;
+}
+
+.guest-access-btn:hover {
+  background-color: #218838;
+  transform: translateY(-2px);
+}
+
+.guest-access-btn:active {
+  transform: translateY(0);
+}
+
 /* Séparateur */
 .separator {
   display: flex;

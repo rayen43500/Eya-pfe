@@ -114,6 +114,9 @@ export class LoginClientComponent implements OnInit {
       this.loading = true;
       this.errorMessage = '';
       
+      // Désactiver le mode invité si activé
+      this.authClientService.disableGuestMode();
+      
       const credentials = {
         username: this.loginForm.value.username,
         password: this.loginForm.value.password
@@ -223,6 +226,19 @@ export class LoginClientComponent implements OnInit {
     this.activeForm = form;
     this.errorMessage = '';
     this.registerError = '';
+  }
+
+  continueAsGuest(): void {
+    console.log('Navigation en mode invité vers la boutique');
+    
+    // Activer explicitement le mode invité
+    this.authClientService.enableGuestMode();
+    
+    // Attendre un court instant pour assurer que le mode invité est bien activé
+    setTimeout(() => {
+      // Utiliser la navigation Angular au lieu de window.location pour éviter un rechargement complet
+      this.router.navigate(['/shoop-bord']);
+    }, 100);
   }
 
   logout(): void {

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent, HttpErrorResponse } from '@angular/common/http';
-import { Observable, throwError } from 'rxjs';
+import { Observable, throwError, of } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
 import { AuthClientService } from '../services/auth-client.service';
@@ -17,79 +17,47 @@ export class UnifiedAuthInterceptor implements HttpInterceptor {
     private router: Router
   ) {}
 
-  intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    // Journalisation pour le débogage
-    console.log(`🔍 UnifiedAuthInterceptor - URL: ${request.url}`);
+  intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+    // Vérifier d'abord si nous sommes en mode invité
+    if (this.authClientService.isGuestMode()) {
+      console.log('Mode invité: skip auth pour la requête:', request.url);
+      // En mode invité, nous n'ajoutons pas de token d'authentification
+      return next.handle(request).pipe(
+        catchError(error => {
+          // Ignorer les erreurs 401 en mode invité
+          if (error instanceof HttpErrorResponse && error.status === 401) {
+            console.log('Erreur 401 ignorée en mode invité');
+            // Retourner un observable vide au lieu de l'erreur elle-même
+            return new Observable<HttpEvent<unknown>>(observer => {
+              observer.complete();
+            });
+          }
+          return throwError(() => error);
+        })
+      );
+    }
 
-    // 1. IGNORER LES REQUÊTES D'AUTHENTIFICATION
-    if (this.isAuthRequest(request.url)) {
-      console.log('🔐 Requête d\'authentification, aucune modification');
+    // Cas standard (pas en mode invité)
+    // Vérifier si c'est une requête d'authentification
+    if (this.isAuthRequest(request)) {
       return next.handle(request);
     }
 
-    // 2. ÉVITER LA DOUBLE AUTHENTIFICATION
-    if (request.headers.has('Authorization')) {
-      console.log('🔄 Requête déjà authentifiée');
-      return next.handle(request);
-    }
-
-    // 3. OBTENIR LE TYPE D'UTILISATEUR
+    // Déterminer le type d'utilisateur en fonction des tokens disponibles
     const userType = localStorage.getItem('user_type');
-    console.log(`👤 Type d'utilisateur: ${userType || 'non connecté'}`);
-
-    // 4. APPLIQUER LE TOKEN APPROPRIÉ
-    let authReq = request;
-    let token = null;
 
     if (userType === 'admin') {
-      token = this.authAdminService.getAdminToken();
-      console.log('👑 Token Admin:', token ? 'présent' : 'absent');
+      return this.handleAdminRequest(request, next);
     } else if (userType === 'client') {
-      token = this.authClientService.getClientToken();
-      console.log('🛒 Token Client:', token ? 'présent' : 'absent');
-    } else if (userType === 'livreur') {
-      token = this.authService.getAccessToken();
-      console.log('🚚 Token Livreur:', token ? 'présent' : 'absent');
+      return this.handleClientRequest(request, next);
     } else {
-      // Pas de user_type défini
-      token = this.authService.getAccessToken();
-      console.log('🔑 Token générique:', token ? 'présent' : 'absent');
+      // Aucun type d'utilisateur défini, requête sans authentification
+      return next.handle(request);
     }
-
-    // Ajouter le token s'il existe
-    if (token) {
-      authReq = request.clone({
-        headers: request.headers.set('Authorization', `Bearer ${token}`)
-      });
-      console.log('✅ Token ajouté à la requête');
-    } else {
-      console.log('⚠️ Aucun token disponible');
-    }
-
-    // Gérer les erreurs d'authentification
-    return next.handle(authReq).pipe(
-      catchError((error: HttpErrorResponse) => {
-        if (error.status === 401) {
-          console.log('🔒 Erreur 401 - Tentative de rafraîchissement du token');
-          
-          // Rafraîchir le token selon le type d'utilisateur
-          if (userType === 'admin') {
-            return this.refreshAdminToken(request, next);
-          } else if (userType === 'client') {
-            return this.refreshClientToken(request, next);
-          } else if (userType === 'livreur') {
-            return this.refreshLivreurToken(request, next);
-          } else {
-            return this.refreshMainToken(request, next);
-          }
-        }
-        return throwError(() => error);
-      })
-    );
   }
 
   // Vérifier si c'est une requête d'authentification
-  private isAuthRequest(url: string): boolean {
+  private isAuthRequest(request: HttpRequest<unknown>): boolean {
     const authEndpoints = [
       '/api/token/',
       '/accounts/api/login/',
@@ -100,61 +68,21 @@ export class UnifiedAuthInterceptor implements HttpInterceptor {
       '/register/'
     ];
     
-    // Ignorer aussi les routes de statistiques et rapports
+    // Ignorer aussi les routes de statistiques, rapports et API publique
     const publicRoutes = [
       '/reports',
       '/direct-statistics',
-      '/statistics'
+      '/statistics',
+      '/api/products/',
+      '/api/categories/'
     ];
     
-    return authEndpoints.some(endpoint => url.includes(endpoint)) || 
-           publicRoutes.some(route => url.includes(route));
+    return authEndpoints.some(endpoint => request.url.includes(endpoint)) || 
+           publicRoutes.some(route => request.url.includes(route));
   }
 
   // Méthodes de rafraîchissement du token selon le type d'utilisateur
-  private refreshMainToken(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    return this.authService.refreshToken().pipe(
-      switchMap(() => {
-        const token = this.authService.getAccessToken();
-        if (!token) {
-          this.authService.logout();
-          return throwError(() => new Error('Échec du rafraîchissement du token'));
-        }
-        
-        const authReq = request.clone({
-          headers: request.headers.set('Authorization', `Bearer ${token}`)
-        });
-        return next.handle(authReq);
-      }),
-      catchError(error => {
-        this.authService.logout();
-        return throwError(() => error);
-      })
-    );
-  }
-
-  private refreshClientToken(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    return this.authClientService.refreshClientToken().pipe(
-      switchMap(() => {
-        const token = this.authClientService.getClientToken();
-        if (!token) {
-          this.authClientService.logout();
-          return throwError(() => new Error('Échec du rafraîchissement du token client'));
-        }
-        
-        const authReq = request.clone({
-          headers: request.headers.set('Authorization', `Bearer ${token}`)
-        });
-        return next.handle(authReq);
-      }),
-      catchError(error => {
-        this.authClientService.logout();
-        return throwError(() => error);
-      })
-    );
-  }
-
-  private refreshAdminToken(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+  private handleAdminRequest(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     return this.authAdminService.refreshAdminToken().pipe(
       switchMap(() => {
         const token = this.authAdminService.getAdminToken();
@@ -175,13 +103,13 @@ export class UnifiedAuthInterceptor implements HttpInterceptor {
     );
   }
 
-  private refreshLivreurToken(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    return this.authService.refreshToken().pipe(
+  private handleClientRequest(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+    return this.authClientService.refreshClientToken().pipe(
       switchMap(() => {
-        const token = this.authService.getAccessToken();
+        const token = this.authClientService.getClientToken();
         if (!token) {
-          this.authService.logout();
-          return throwError(() => new Error('Échec du rafraîchissement du token livreur'));
+          this.authClientService.logout();
+          return throwError(() => new Error('Échec du rafraîchissement du token client'));
         }
         
         const authReq = request.clone({
@@ -190,7 +118,7 @@ export class UnifiedAuthInterceptor implements HttpInterceptor {
         return next.handle(authReq);
       }),
       catchError(error => {
-        this.authService.logout();
+        this.authClientService.logout();
         return throwError(() => error);
       })
     );

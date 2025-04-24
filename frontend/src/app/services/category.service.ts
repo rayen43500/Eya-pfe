@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, BehaviorSubject, of, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
+import { AuthClientService } from './auth-client.service';
 
 export interface Category {
   id: number;
@@ -29,13 +30,35 @@ export class CategoryService {
     { id: 5, name: 'Alimentation', description: 'Produits alimentaires et boissons', count: 23 }
   ];
 
-  constructor(private http: HttpClient) {
+  constructor(
+    private http: HttpClient,
+    private authClientService: AuthClientService
+  ) {
     // Charger les catégories au démarrage
     this.loadCategories();
   }
+  
+  // Méthode pour obtenir les en-têtes d'authentification
+  private getAuthHeaders(): HttpHeaders {
+    // En mode invité, ne pas envoyer de token d'authentification
+    if (this.authClientService.isGuestMode()) {
+      console.log('CategoryService - Mode invité: aucun token d\'authentification envoyé');
+      return new HttpHeaders({
+        'Content-Type': 'application/json'
+      });
+    }
+    
+    // Mode authentifié, envoyer le token
+    const token = this.authClientService.getClientToken();
+    return new HttpHeaders({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    });
+  }
 
   loadCategories(): void {
-    this.http.get<Category[]>(this.apiUrl)
+    const headers = this.getAuthHeaders();
+    this.http.get<Category[]>(this.apiUrl, { headers })
       .pipe(
         catchError(error => {
           console.error('Erreur lors du chargement des catégories', error);
@@ -65,7 +88,8 @@ export class CategoryService {
       return throwError(() => new Error(`Une catégorie avec le nom "${category.name}" existe déjà.`));
     }
     
-    return this.http.post<Category>(this.apiUrl, category)
+    const headers = this.getAuthHeaders();
+    return this.http.post<Category>(this.apiUrl, category, { headers })
       .pipe(
         tap(newCategory => {
           // Mettre à jour la liste de catégories
@@ -93,7 +117,8 @@ export class CategoryService {
   }
 
   updateCategory(category: Category): Observable<Category> {
-    return this.http.put<Category>(`${this.apiUrl}${category.id}/`, category)
+    const headers = this.getAuthHeaders();
+    return this.http.put<Category>(`${this.apiUrl}${category.id}/`, category, { headers })
       .pipe(
         tap(updatedCategory => {
           // Mettre à jour la liste de catégories
@@ -128,7 +153,8 @@ export class CategoryService {
   }
 
   deleteCategory(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}${id}/`)
+    const headers = this.getAuthHeaders();
+    return this.http.delete<void>(`${this.apiUrl}${id}/`, { headers })
       .pipe(
         tap(() => {
           // Mettre à jour la liste de catégories

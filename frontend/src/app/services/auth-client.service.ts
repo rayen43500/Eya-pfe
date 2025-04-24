@@ -95,6 +95,9 @@ export class AuthClientService {
   loginClient(credentials: { username: string, password: string }): Observable<ClientLoginResponse> {
     console.log(`👤 Tentative de connexion client avec nom d'utilisateur: ${credentials.username}`);
     
+    // Désactiver le mode invité s'il était activé
+    this.disableGuestMode();
+    
     // 1. Nettoyer toutes les données d'authentification existantes
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
@@ -138,6 +141,9 @@ export class AuthClientService {
           this.clientAuthStatusSubject.next(true);
           
           console.log('🔐 Authentification client complète et jetons stockés');
+          
+          // Vérifier s'il y a un produit en attente dans le localStorage
+          this.checkPendingCartProduct();
         }),
         catchError(error => {
           console.error('🛑 Erreur de connexion client:', error);
@@ -145,6 +151,27 @@ export class AuthClientService {
           return throwError(() => error);
         })
       );
+  }
+
+  // Méthode pour vérifier et ajouter un produit en attente après connexion
+  private checkPendingCartProduct(): void {
+    const pendingProduct = localStorage.getItem('pendingCartProduct');
+    if (pendingProduct) {
+      try {
+        const product = JSON.parse(pendingProduct);
+        console.log('🛒 Produit en attente trouvé après connexion:', product.name);
+        
+        // Émettre un événement pour ajouter le produit au panier
+        // Note: cette partie peut varier selon l'implémentation de votre CartService
+        // On pourrait ajouter un BehaviorSubject spécifique ou utiliser un autre service pour communiquer
+        
+        // Supprimer le produit en attente du localStorage une fois traité
+        localStorage.removeItem('pendingCartProduct');
+      } catch (error) {
+        console.error('Erreur lors de la récupération du produit en attente:', error);
+        localStorage.removeItem('pendingCartProduct');
+      }
+    }
   }
 
   registerClient(data: ClientRegistrationData): Observable<any> {
@@ -158,6 +185,12 @@ export class AuthClientService {
   }
 
   getClientToken(): string | null {
+    // Si mode invité, ne pas renvoyer de token
+    if (this.isGuestMode()) {
+      console.log('Mode invité actif: aucun token renvoyé');
+      return null;
+    }
+    
     // Mode développement - pour faciliter le test sans authentification
     const isDevMode = true;  // Activé pour le développement
     
@@ -265,6 +298,13 @@ export class AuthClientService {
   }
 
   isClientAuthenticated(): boolean {
+    // Mode développement - Si la navigation en mode invité est activée, 
+    // considérer que l'accès visiteur est suffisant pour la consultation
+    const isGuestMode = localStorage.getItem('guest_mode') === 'true';
+    if (isGuestMode) {
+      return false; // Retourne false pour que l'utilisateur soit identifié comme invité
+    }
+    
     const userType = localStorage.getItem('user_type');
     const token = localStorage.getItem(this.CLIENT_TOKEN_KEY);
     
@@ -294,7 +334,48 @@ export class AuthClientService {
       return false;
     }
   }
+
+  // Méthode pour activer le mode invité (navigation sans compte)
+  enableGuestMode(): void {
+    console.log('Mode invité activé pour la navigation dans la boutique');
+    
+    // Définir le flag du mode invité
+    localStorage.setItem('guest_mode', 'true');
+    
+    // S'assurer que tous les tokens précédents sont nettoyés
+    this.clearStoredTokens();
+    
+    // Mettre à jour le statut d'authentification
+    this.clientAuthStatusSubject.next(false);
+  }
   
+  // Nettoyer les tokens stockés pour s'assurer qu'il n'y a pas de conflit
+  private clearStoredTokens(): void {
+    // Tokens du client
+    localStorage.removeItem(this.CLIENT_TOKEN_KEY);
+    localStorage.removeItem(this.CLIENT_REFRESH_TOKEN_KEY);
+    localStorage.removeItem(this.CLIENT_USER_KEY);
+    
+    // Tokens génériques
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('currentUser');
+    
+    // Supprimer user_type pour éviter les conflits
+    localStorage.removeItem('user_type');
+  }
+  
+  // Méthode pour vérifier si l'utilisateur est en mode invité
+  isGuestMode(): boolean {
+    return localStorage.getItem('guest_mode') === 'true';
+  }
+  
+  // Désactiver le mode invité (lors de la connexion)
+  disableGuestMode(): void {
+    console.log('Mode invité désactivé');
+    localStorage.removeItem('guest_mode');
+  }
+
   getClientUserFromStorage(): any {
     const userStr = localStorage.getItem(this.CLIENT_USER_KEY);
     return userStr ? JSON.parse(userStr) : null;

@@ -5,6 +5,7 @@ import { CommonModule } from '@angular/common';
 import { OrderService, Order, CreateOrderRequest } from '../../services/order.service';
 import { CartService } from '../../services/cart.service';
 import { HttpErrorResponse } from '@angular/common/http';
+import { AuthClientService } from '../../services/auth-client.service';
 
 @Component({
   selector: 'app-checkout',
@@ -33,11 +34,21 @@ export class CheckoutComponent implements OnInit {
     private router: Router,
     private route: ActivatedRoute,
     private orderService: OrderService,
-    public cartService: CartService
+    public cartService: CartService,
+    private authClientService: AuthClientService
   ) {}
   
   ngOnInit(): void {
-    // Vérifier si l'utilisateur est connecté et a des articles dans son panier
+    // Vérifier si l'utilisateur est connecté
+    if (!this.authClientService.isClientAuthenticated()) {
+      console.log('💡 Utilisateur non authentifié. Redirection vers la page de connexion...');
+      this.router.navigate(['/login-client'], { 
+        queryParams: { returnUrl: '/checkout' }
+      });
+      return;
+    }
+    
+    // Vérifier si l'utilisateur a des articles dans son panier
     this.cartItems = this.cartService.getCartItems();
     if (this.cartItems.length === 0) {
       this.router.navigate(['/espaceclient/shoop-bord']);

@@ -98,11 +98,10 @@ const routes: Routes = [
   },
   { 
     path: 'espaceclient', 
-    canActivate: [ClientAuthGuard],
     children: [
       { path: '', redirectTo: 'shoop-bord', pathMatch: 'full' },
       { path: 'shoop-bord', component: ShoopBordComponent },
-      { path: 'mes-commandes', component: MesCommandesComponent },
+      { path: 'mes-commandes', component: MesCommandesComponent, canActivate: [ClientAuthGuard] },
     ]
   },
   { path: '**', redirectTo: '/login-client' }

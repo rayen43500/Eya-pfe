@@ -4,6 +4,7 @@ import { Observable, throwError, forkJoin, of } from 'rxjs';
 import { catchError, tap, switchMap, map, delay, take } from 'rxjs/operators';
 import { Product } from './product.service';
 import { AuthService } from './auth.service';
+import { AuthClientService } from './auth-client.service';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 
@@ -92,8 +93,30 @@ export class OrderService {
   private apiUrl = 'http://localhost:8000/api/orders/';
   private devMode = false;
   
-  constructor(private http: HttpClient, private authService: AuthService) {
+  constructor(
+    private http: HttpClient, 
+    private authService: AuthService,
+    private authClientService: AuthClientService
+  ) {
     console.log('OrderService initialisé avec URL:', this.apiUrl);
+  }
+  
+  // Méthode pour obtenir les en-têtes d'authentification
+  private getAuthHeaders(): HttpHeaders {
+    // En mode invité, ne pas envoyer de token d'authentification
+    if (this.authClientService.isGuestMode()) {
+      console.log('OrderService - Mode invité: aucun token d\'authentification envoyé');
+      return new HttpHeaders({
+        'Content-Type': 'application/json'
+      });
+    }
+    
+    // Mode authentifié, envoyer le token
+    const token = this.authClientService.getClientToken();
+    return new HttpHeaders({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    });
   }
   
   // Obtenir toutes les commandes
@@ -103,7 +126,8 @@ export class OrderService {
       url = `${url}?status=${status}`;
     }
     
-    return this.http.get<Order[]>(url).pipe(
+    const headers = this.getAuthHeaders();
+    return this.http.get<Order[]>(url, { headers }).pipe(
       tap(orders => console.log('Commandes récupérées:', orders.length)),
       catchError(this.handleError)
     );
@@ -121,7 +145,8 @@ export class OrderService {
         const clientId = currentUser.id;
         console.log('Récupération des commandes pour le client:', clientId);
 
-        return this.http.get<Order[]>(`${this.apiUrl}?client=${clientId}`).pipe(
+        const headers = this.getAuthHeaders();
+        return this.http.get<Order[]>(`${this.apiUrl}?client=${clientId}`, { headers }).pipe(
           tap(orders => console.log('Commandes client récupérées:', orders.length)),
           catchError(error => {
             console.error('Erreur lors de la récupération des commandes:', error);
@@ -134,7 +159,8 @@ export class OrderService {
   
   // Obtenir les détails d'une commande
   getOrderDetails(orderId: number): Observable<Order> {
-    return this.http.get<Order>(`${this.apiUrl}/${orderId}`).pipe(
+    const headers = this.getAuthHeaders();
+    return this.http.get<Order>(`${this.apiUrl}/${orderId}`, { headers }).pipe(
       tap(order => console.log('Détails de la commande récupérés:', order.id)),
       catchError(this.handleError)
     );
@@ -142,7 +168,8 @@ export class OrderService {
   
   // Créer une nouvelle commande
   createOrder(orderData: CreateOrderRequest): Observable<Order> {
-    return this.http.post<Order>(this.apiUrl, orderData).pipe(
+    const headers = this.getAuthHeaders();
+    return this.http.post<Order>(this.apiUrl, orderData, { headers }).pipe(
       tap(response => console.log('Commande créée:', response)),
       catchError(this.handleError)
     );
@@ -150,7 +177,8 @@ export class OrderService {
   
   // Mettre à jour le statut d'une commande
   updateOrderStatus(orderId: number, status: string): Observable<Order> {
-    return this.http.patch<Order>(`${this.apiUrl}${orderId}/update_status/`, { status }).pipe(
+    const headers = this.getAuthHeaders();
+    return this.http.patch<Order>(`${this.apiUrl}${orderId}/update_status/`, { status }, { headers }).pipe(
       tap(order => console.log(`Statut de la commande ${orderId} mis à jour à ${status}`)),
       catchError(this.handleError)
     );
@@ -158,7 +186,8 @@ export class OrderService {
   
   // Supprimer une commande
   deleteOrder(orderId: number): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/${orderId}/`).pipe(
+    const headers = this.getAuthHeaders();
+    return this.http.delete<void>(`${this.apiUrl}/${orderId}/`, { headers }).pipe(
       tap(() => console.log('Commande supprimée:', orderId)),
       catchError(this.handleError)
     );
@@ -166,7 +195,8 @@ export class OrderService {
 
   // Obtenir les commandes en attente pour un livreur
   getPendingDeliveries(): Observable<Order[]> {
-    return this.http.get<Order[]>(`${this.apiUrl}?status=shipped&livreur__isnull=true`).pipe(
+    const headers = this.getAuthHeaders();
+    return this.http.get<Order[]>(`${this.apiUrl}?status=shipped&livreur__isnull=true`, { headers }).pipe(
       tap(orders => console.log('Livraisons en attente récupérées:', orders.length)),
       catchError(error => {
         console.error('Erreur lors de la récupération des livraisons en attente:', error);
@@ -187,7 +217,8 @@ export class OrderService {
         const livreurId = currentUser.id;
         console.log('Récupération des livraisons assignées pour le livreur:', livreurId);
 
-        return this.http.get<Order[]>(`${this.apiUrl}?status=shipped&livreur=${livreurId}`).pipe(
+        const headers = this.getAuthHeaders();
+        return this.http.get<Order[]>(`${this.apiUrl}?status=shipped&livreur=${livreurId}`, { headers }).pipe(
           tap(orders => console.log('Livraisons assignées récupérées:', orders.length)),
           catchError(error => {
             console.error('Erreur lors de la récupération des livraisons assignées:', error);
@@ -200,7 +231,8 @@ export class OrderService {
 
   // Valider une livraison
   validateDelivery(orderId: number, deliveryCode: string): Observable<Order> {
-    return this.http.post<Order>(`${this.apiUrl}/validate/${orderId}/`, { delivery_code: deliveryCode }).pipe(
+    const headers = this.getAuthHeaders();
+    return this.http.post<Order>(`${this.apiUrl}/validate/${orderId}/`, { delivery_code: deliveryCode }, { headers }).pipe(
       tap(order => console.log(`Livraison ${orderId} validée avec le code`)),
       catchError(this.handleError)
     );
@@ -208,7 +240,8 @@ export class OrderService {
 
   // Assigner un livreur à une commande
   assignLivreur(orderId: number, livreurId: number): Observable<Order> {
-    return this.http.post<Order>(`${this.apiUrl}/assign/${orderId}/`, { livreur_id: livreurId }).pipe(
+    const headers = this.getAuthHeaders();
+    return this.http.post<Order>(`${this.apiUrl}/assign/${orderId}/`, { livreur_id: livreurId }, { headers }).pipe(
       tap(order => console.log(`Livreur ${livreurId} assigné à la commande ${orderId}`)),
       catchError(this.handleError)
     );
@@ -216,7 +249,8 @@ export class OrderService {
 
   // Appliquer un code promo à une commande
   applyPromoCode(orderId: number, promoCode: string): Observable<Order> {
-    return this.http.post<Order>(`${this.apiUrl}/${orderId}/apply_promo/`, { promo_code: promoCode }).pipe(
+    const headers = this.getAuthHeaders();
+    return this.http.post<Order>(`${this.apiUrl}/${orderId}/apply_promo/`, { promo_code: promoCode }, { headers }).pipe(
       tap(order => console.log(`Code promo appliqué à la commande ${orderId}`)),
       catchError(this.handleError)
     );
@@ -256,41 +290,39 @@ export class OrderService {
   // Obtenir toutes les commandes (pour admin)
   getAllOrders(status?: OrderStatus): Observable<Order[]> {
     if (this.devMode) {
-      const mockOrders = this.generateMockOrders();
-      const filteredOrders = status 
-        ? mockOrders.filter(order => order.status === status)
-        : mockOrders;
-      return of(filteredOrders).pipe(delay(500));
-    }
-
-    let url = this.apiUrl;
-    if (status) {
-      url = `${url}?status=${status}`;
+      return of(this.generateMockOrders()).pipe(
+        delay(800), // Simuler un délai réseau
+        take(1)
+      );
     }
     
-    return this.http.get<Order[]>(url).pipe(
-      tap(orders => {
-        console.log('Toutes les commandes récupérées:', orders.length);
-        // Sauvegarder les commandes dans le localStorage pour le mode développement
-        if (this.devMode) {
-          localStorage.setItem('mockOrders', JSON.stringify(orders));
-        }
-      }),
-      catchError(error => {
-        console.error('Erreur lors de la récupération de toutes les commandes:', error);
-        return of(this.generateMockOrders());
+    let url = this.apiUrl;
+    if (status) {
+      url += `?status=${status}`;
+    }
+    
+    const headers = this.getAuthHeaders();
+    return this.http.get<Order[]>(url, { headers }).pipe(
+      catchError((error) => {
+        console.error('Erreur lors de la récupération des commandes', error);
+        return of([]);
       })
     );
   }
 
   // Mettre à jour une commande
   updateOrder(orderId: number, updateData: any): Observable<Order> {
-    return this.http.patch<Order>(`${this.apiUrl}/${orderId}/`, updateData).pipe(
-      tap(order => console.log('Commande mise à jour:', order.id)),
-      catchError(error => {
-        console.error('Erreur lors de la mise à jour de la commande:', error);
-        return throwError(() => error);
-      })
+    if (this.devMode) {
+      console.log('Mode développement: simulation de mise à jour de commande');
+      return of({...this.generateMockOrders()[0], ...updateData}).pipe(
+        delay(800)
+      );
+    }
+    
+    const headers = this.getAuthHeaders();
+    return this.http.patch<Order>(`${this.apiUrl}${orderId}/`, updateData, { headers }).pipe(
+      tap(updatedOrder => console.log('Commande mise à jour:', updatedOrder)),
+      catchError(this.handleError)
     );
   }
 

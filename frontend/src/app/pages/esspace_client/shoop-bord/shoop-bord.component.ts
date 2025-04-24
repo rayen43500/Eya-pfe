@@ -59,38 +59,14 @@ export class ShoopBordComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     console.log('===== ShoopBordComponent initialisé =====');
-    console.log('URL actuelle:', window.location.href);
     
-    // Vérification de l'authentification
-    if (!this.isDevMode && !this.authClientService.isClientAuthenticated()) {
-      console.log('Utilisateur non authentifié, redirection vers la page de connexion');
-      this.router.navigate(['/login-client']);
-      return;
-    }
-    
-    if (this.authClientService.isClientAuthenticated()) {
-      console.log('✅ Utilisateur authentifié :', this.authClientService.getClientUserFromStorage());
-      console.log('🔑 Token présent :', !!this.authClientService.getClientToken());
-    } else {
-      console.log('⚠️ Mode développement: bypass authentification activé');
-    }
-    
-    // Vérifier s'il y a un paramètre de succès de commande
-    this.route.queryParams.subscribe(params => {
-      if (params['orderSuccess'] === 'true') {
-        const orderId = params['orderId'];
-        this.showNotification(`Votre commande #${orderId} a été confirmée avec succès!`, 5000);
-      }
-      
-      // Ajouter vérification du paramètre de page
-      if (params['page']) {
-        this.currentPage = parseInt(params['page'], 10) || 1;
-      }
-    });
+    // Ne pas faire de vérification d'authentification
+    // La boutique est accessible à tous
     
     // Chargement des catégories
     this.loadCategories();
     
+    // Chargement des produits
     console.log('Chargement des produits...');
     this.loadProducts();
     
@@ -122,6 +98,15 @@ export class ShoopBordComponent implements OnInit, OnDestroy {
   }
 
   private getAuthHeaders(): HttpHeaders {
+    // En mode invité, ne pas envoyer de token d'authentification
+    if (this.authClientService.isGuestMode()) {
+      console.log('Mode invité: aucun token d\'authentification envoyé');
+      return new HttpHeaders({
+        'Content-Type': 'application/json'
+      });
+    }
+    
+    // Mode authentifié, envoyer le token
     const token = this.authClientService.getClientToken();
     return new HttpHeaders({
       'Content-Type': 'application/json',
@@ -133,60 +118,58 @@ export class ShoopBordComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.error = null;
     
-    const headers = this.getAuthHeaders();
-    this.http.get<Product[]>('http://localhost:8000/api/products/', { headers })
-      .subscribe({
-        next: (data) => {
-          console.log('Produits reçus:', data);
-          console.log('Nombre de produits reçus:', data.length);
+    // Utiliser directement le service de produits sans en-têtes d'authentification
+    this.productService.getProducts().subscribe({
+      next: (data) => {
+        console.log('Produits reçus:', data.length);
+        
+        // Calculer les prix finaux avec remise
+        this.products = data.map(product => {
+          // Gestion correcte des images
+          let imageUrl = 'assets/images/placeholder.png';
           
-          // Calculer les prix finaux avec remise
-          this.products = data.map(product => {
-            // Gestion correcte des images
-            let imageUrl = 'assets/images/placeholder.png';
-            
-            if (product.image) {
-              // Si l'image est une URL complète, l'utiliser telle quelle
-              if (product.image.startsWith('http')) {
-                imageUrl = product.image;
-              } 
-              // Si c'est un chemin relatif à /media/, construire l'URL complète
-              else {
-                // Supprimer le premier slash s'il existe pour éviter une double barre
-                const imagePath = product.image.startsWith('/') ? product.image.substring(1) : product.image;
-                imageUrl = `http://localhost:8000/media/${imagePath}`;
-              }
+          if (product.image) {
+            // Si l'image est une URL complète, l'utiliser telle quelle
+            if (product.image.startsWith('http')) {
+              imageUrl = product.image;
+            } 
+            // Si c'est un chemin relatif à /media/, construire l'URL complète
+            else {
+              // Supprimer le premier slash s'il existe pour éviter une double barre
+              const imagePath = product.image.startsWith('/') ? product.image.substring(1) : product.image;
+              imageUrl = `http://localhost:8000/media/${imagePath}`;
             }
-            
-            return {
-              ...product,
-              image: imageUrl,
-              // Calculer le prix final si une remise est appliquée
-              final_price: product.discount_percentage ? 
-                product.price * (1 - (product.discount_percentage / 100)) : 
-                product.price
-            };
-          });
+          }
           
-          // Déterminer le prix maximum pour le filtre
-          this.maxPrice = Math.max(...this.products.map(p => p.price));
-          this.priceRange = [0, this.maxPrice];
-          
-          this.filteredProducts = [...this.products];
-          this.loading = false;
-          
-          console.log('Produits chargés avec succès. Total:', this.products.length);
-          
-          // Initialiser explicitement la pagination
-          this.updatePagination();
-          console.log('Pagination initialisée avec', this.itemsPerPage, 'produits par page');
-        },
-        error: (err) => {
-          console.error('Erreur lors du chargement des produits', err);
-          this.error = 'Impossible de charger les produits. Veuillez réessayer plus tard.';
-          this.loading = false;
-        }
-      });
+          return {
+            ...product,
+            image: imageUrl,
+            // Calculer le prix final si une remise est appliquée
+            final_price: product.discount_percentage ? 
+              product.price * (1 - (product.discount_percentage / 100)) : 
+              product.price
+          };
+        });
+        
+        // Déterminer le prix maximum pour le filtre
+        this.maxPrice = Math.max(...this.products.map(p => p.price));
+        this.priceRange = [0, this.maxPrice];
+        
+        this.filteredProducts = [...this.products];
+        this.loading = false;
+        
+        console.log('Produits chargés avec succès. Total:', this.products.length);
+        
+        // Initialiser explicitement la pagination
+        this.updatePagination();
+        console.log('Pagination initialisée avec', this.itemsPerPage, 'produits par page');
+      },
+      error: (err) => {
+        console.error('Erreur lors du chargement des produits', err);
+        this.error = 'Impossible de charger les produits. Veuillez réessayer plus tard.';
+        this.loading = false;
+      }
+    });
   }
 
   filterProducts(): void {
@@ -261,6 +244,25 @@ export class ShoopBordComponent implements OnInit, OnDestroy {
   }
 
   addToCart(product: Product): void {
+    // Vérifier si l'utilisateur est authentifié ou en mode invité
+    if (!this.authClientService.isClientAuthenticated()) {
+      // Si en mode invité, rediriger vers la connexion avec le produit mémorisé
+      console.log('Utilisateur non authentifié, redirection vers la page de connexion');
+      
+      // Stocker le produit dans le localStorage pour l'ajouter après connexion
+      localStorage.setItem('pendingCartProduct', JSON.stringify(product));
+      
+      // Message explicatif pour informer l'utilisateur
+      this.showNotification('Vous devez vous connecter pour ajouter des produits au panier', 3000, 'info');
+      
+      // Rediriger après un court délai pour permettre la lecture du message
+      setTimeout(() => {
+        this.router.navigate(['/login-client'], { queryParams: { returnUrl: '/direct-shoop-bord' } });
+      }, 1500);
+      return;
+    }
+    
+    // Reste du code existant pour ajouter au panier
     console.log('Tentative d\'ajout au panier:', product.name);
     
     // Vérifier si le produit est disponible et en stock
@@ -341,7 +343,21 @@ export class ShoopBordComponent implements OnInit, OnDestroy {
   }
 
   checkout(): void {
-    // Rediriger vers la page de checkout
+    // Vérifier si l'utilisateur est authentifié avant de procéder au checkout
+    if (!this.authClientService.isClientAuthenticated()) {
+      console.log('Utilisateur non authentifié, redirection vers la page de connexion');
+      
+      // Message explicatif
+      this.showNotification('Vous devez vous connecter pour finaliser votre commande', 3000, 'info');
+      
+      // Rediriger après un court délai
+      setTimeout(() => {
+        this.router.navigate(['/login-client'], { queryParams: { returnUrl: '/checkout' } });
+      }, 1500);
+      return;
+    }
+    
+    // Procéder au checkout
     this.router.navigate(['/checkout']);
   }
 

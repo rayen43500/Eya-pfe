@@ -38,6 +38,10 @@
         <span *ngIf="loading">Connexion en cours...</span>
         <span *ngIf="!loading">Se connecter</span>
       </button>
+      
+      <button type="button" class="guest-access-btn" (click)="continueAsGuest()">
+        <i class="fas fa-shopping-cart"></i> Accéder sans compte
+      </button>
 
       <div class="separator">ou</div>
 
